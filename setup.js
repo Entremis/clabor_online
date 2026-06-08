@@ -86,8 +86,8 @@ document.getElementById('gameSetup').onsubmit = function(event) {
     var gameSize = document.querySelector('input[name="gameSize"]:checked').value;
     var mode = getMode();
     var playerNames = Array.from(document.querySelectorAll('input[name="playerName"]'))
-                           .map(input => input.value.trim())
-                           .filter(name => name !== '');
+                           .map(function(input) { return input.value.trim(); })
+                           .filter(function(name) { return name !== ''; });
 
     if (mode === 'pairs') {
         if (playerNames.length !== 2) {
@@ -99,10 +99,34 @@ document.getElementById('gameSetup').onsubmit = function(event) {
         return;
     }
 
+    // Ask confirmation before overwriting an unfinished game.
+    var raw = localStorage.getItem('currentGame');
+    if (raw) {
+        var existing;
+        try { existing = JSON.parse(raw); } catch (e) { existing = null; }
+        if (existing && !existing.finished) {
+            if (!confirm('Есть незаконченная игра (' + existing.players.join(', ') + '). Начать новую? Старая будет удалена.')) {
+                return;
+            }
+        }
+    }
+
+    var game = {
+        id: String(Date.now()),
+        startedAt: new Date().toISOString(),
+        mode: mode,
+        target: parseInt(gameSize, 10),
+        players: playerNames,
+        currentDealer: 0,
+        rounds: [],
+        finished: false
+    };
+    localStorage.setItem('currentGame', JSON.stringify(game));
+
+    // Keep legacy keys so game_logic.js helper functions work.
     localStorage.setItem('gameSize', gameSize);
     localStorage.setItem('gameMode', mode);
     localStorage.setItem('playerNames', JSON.stringify(playerNames));
-    // Новая игра — раздаёт первый игрок/пара.
     localStorage.setItem('currentDealer', '0');
     window.location.href = 'game_page.html';
 };
@@ -112,3 +136,16 @@ Array.from(document.querySelectorAll('input[name="gameMode"]')).forEach(function
     r.onchange = renderInputs;
 });
 renderInputs();
+
+// Show resume block if there is an unfinished game in localStorage.
+(function checkUnfinishedGame() {
+    var raw = localStorage.getItem('currentGame');
+    if (!raw) { return; }
+    var game;
+    try { game = JSON.parse(raw); } catch (e) { return; }
+    if (!game || game.finished) { return; }
+    var block = document.getElementById('resumeBlock');
+    if (!block) { return; }
+    document.getElementById('resumePlayers').innerText = game.players.join(', ');
+    block.style.display = 'block';
+})();

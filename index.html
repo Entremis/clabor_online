@@ -8,6 +8,12 @@
 </head>
 <body>
 <h2>Настройка игры</h2>
+
+<div id="resumeBlock" class="resume-block" style="display:none;">
+    <strong>Незаконченная игра:</strong> <span id="resumePlayers"></span>
+    <button type="button" onclick="window.location.href='game_page.html'">Продолжить</button>
+</div>
+
 <form id="gameSetup">
     <p>Размер игры:</p>
     <input type="radio" id="score501" name="gameSize" value="501" checked>

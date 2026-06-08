@@ -184,3 +184,37 @@ tr:nth-child(even) {
     font-size: 22px;
     color: #007BFF;
 }
+
+/* Блок «Незаконченная игра» на стартовом экране */
+.resume-block {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    color: #856404;
+}
+
+.resume-block button {
+    margin: 0;
+    padding: 8px 18px;
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.resume-block button:hover {
+    background-color: #e0a800;
+}
+
+/* Кнопка «Отложить» — нейтральный серый */
+.defer-btn {
+    background-color: #6c757d;
+}
+
+.defer-btn:hover {
+    background-color: #545b62;
+}

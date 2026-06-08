@@ -1,8 +1,90 @@
-window.onload = function() {
-    var playerNames = JSON.parse(localStorage.getItem('playerNames'));
-    var mode = getMode();
-    var gameForm = document.getElementById('gameForm');
+/* ── Persistence helpers ────────────────────────────────────────────────── */
 
+function loadCurrentGame() {
+    var raw = localStorage.getItem('currentGame');
+    if (!raw) { return null; }
+    try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+function saveGame() {
+    var game = loadCurrentGame();
+    if (!game) { return; }
+
+    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
+    var rounds = {};
+
+    for (var i = 0; i < scoreTable.rows.length; i++) {
+        var row = scoreTable.rows[i];
+        var roundNum = parseInt(row.cells[0].innerText, 10);
+        if (!rounds[roundNum]) { rounds[roundNum] = []; }
+        rounds[roundNum].push({
+            name: row.cells[1].innerText,
+            score: parseInt(row.cells[2].querySelector('input').value, 10) || 0,
+            played: row.cells[5].querySelector('select').value
+        });
+    }
+
+    var roundNums = Object.keys(rounds).map(Number).sort(function(a, b) { return a - b; });
+    game.rounds = roundNums.map(function(n) { return rounds[n]; });
+    game.currentDealer = parseInt(localStorage.getItem('currentDealer'), 10) || 0;
+    localStorage.setItem('currentGame', JSON.stringify(game));
+}
+
+// Insert a saved round's rows into the score table without advancing the dealer.
+function replayRound(entries, roundNumber) {
+    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
+    entries.forEach(function(player) {
+        var newRow = scoreTable.insertRow();
+
+        var c = newRow.insertCell();
+        c.innerText = roundNumber;
+
+        c = newRow.insertCell();
+        c.innerText = player.name;
+
+        c = newRow.insertCell();
+        c.innerHTML = '<input type="number" value="' + player.score + '" class="editable"' +
+                      ' data-player="' + player.name + '" data-round="' + roundNumber + '"' +
+                      ' onchange="handleInputChange(this)">';
+
+        c = newRow.insertCell(); // Итоговые очки — пересчитается ниже
+        c.innerText = '';
+
+        c = newRow.insertCell();
+        c.className = 'beit';
+        c.innerText = '-'; // пересчитается в recalculateBeitFromRound
+
+        c = newRow.insertCell();
+        c.innerHTML = '<select class="editable" data-player="' + player.name + '" data-round="' + roundNumber + '">' +
+            '<option value="Да"' + (player.played === 'Да' ? ' selected' : '') + '>Да</option>' +
+            '<option value="Нет"' + (player.played === 'Нет' ? ' selected' : '') + '>Нет</option>' +
+            '</select>';
+
+        c = newRow.insertCell();
+        c.innerHTML = '<button onclick="saveChanges(this)">Сохранить</button>';
+    });
+}
+
+function deferGame() {
+    saveGame();
+    window.location.href = 'index.html';
+}
+
+/* ── Initialisation ─────────────────────────────────────────────────────── */
+
+window.onload = function() {
+    var game = loadCurrentGame();
+    var playerNames = game ? game.players : JSON.parse(localStorage.getItem('playerNames'));
+    var mode = game ? game.mode : (localStorage.getItem('gameMode') || 'individual');
+
+    // Keep legacy keys in sync so existing helper functions keep working.
+    if (game) {
+        localStorage.setItem('playerNames', JSON.stringify(game.players));
+        localStorage.setItem('gameMode', game.mode);
+        localStorage.setItem('gameSize', String(game.target));
+    }
+
+    var gameForm = document.getElementById('gameForm');
     playerNames.forEach(function(name, index) {
         var div = document.createElement('div');
         var scoreAttrs = 'type="number" inputmode="numeric" name="score' + index + '" placeholder="Очки"';
@@ -17,15 +99,26 @@ window.onload = function() {
 
     document.getElementById('targetScore').innerText = String(getTarget());
 
-    // Банк раздачи нужен только в режиме «пара на пару».
     if (mode === 'pairs') {
         document.getElementById('bankControls').style.display = 'block';
         updateBankDisplay();
     }
 
+    // Restore saved rounds (if any) before showing the dealer for the next round.
+    if (game && game.rounds.length > 0) {
+        localStorage.setItem('currentDealer', String(game.currentDealer));
+        game.rounds.forEach(function(entries, i) {
+            replayRound(entries, i + 1);
+        });
+        recalculateBeitFromRound(1);
+        recalculateAllScores();
+    }
+
     updateDealer();
     updateResults();
 };
+
+/* ── Core game helpers ──────────────────────────────────────────────────── */
 
 // Режим игры: 'individual' или 'pairs' (по умолчанию individual).
 function getMode() {
@@ -78,6 +171,8 @@ function recordScores() {
         newCell.innerHTML = `<button onclick="saveChanges(this)">Сохранить</button>`;
     });
 
+    // Save before updateDealer so currentDealer captured is the dealer for this next round.
+    saveGame();
     updateDealer();
     recalculateAllScores();
     updateResults();
@@ -140,6 +235,7 @@ function saveChanges(button) {
     recalculateBeitFromRound(round);
     recalculateAllScores();
     updateResults();
+    saveGame();
 }
 
 function handleInputChange(input) {
@@ -148,6 +244,7 @@ function handleInputChange(input) {
     recalculateBeitFromRound(round);
     recalculateAllScores();
     updateResults();
+    saveGame();
 }
 
 function updateRow(round, playerName, newScore, newPlayed) {
@@ -272,7 +369,7 @@ function updateResults() {
     showWinner(standings, target);
 }
 
-// Победитель: первый, кто достиг целевого счёта. Строка = игрок (или пара в режиме «пара на пару»).
+// Победитель: первый, кто достиг целевого счёта.
 function showWinner(standings, target) {
     var banner = document.getElementById('winnerBanner');
     if (!banner) { return; }
@@ -290,8 +387,7 @@ function showWinner(standings, target) {
     banner.innerText = '🏆 Победитель: ' + winner.name + ' — ' + winner.score + ' очков (игра до ' + target + ')';
 }
 
-/* ============== Банк раздачи и авторасчёт очков пары (режим «пара на пару») ============== */
-// Банк = 162 (голая игра) + объявления. Зная очки одной пары, вторая = банк − первая.
+/* ── Банк раздачи (режим «пара на пару») ────────────────────────────────── */
 
 var calcDecls = { terz: 0, fifty: 0 };
 var lastEditedScore = 'score0';
@@ -314,13 +410,11 @@ function changeDecl(type, delta) {
     onDeclChange();
 }
 
-// Изменили объявления — обновить банк и пересчитать очки второй пары.
 function onDeclChange() {
     updateBankDisplay();
     recomputeOtherPairScore();
 }
 
-// Ввели очки одной пары — посчитать вторую (банк − введённое). Можно поправить вручную.
 function onPairScoreInput(which) {
     lastEditedScore = which;
     recomputeOtherPairScore();
