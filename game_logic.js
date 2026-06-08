@@ -145,26 +145,16 @@ function finishGame() {
 }
 
 function resetGame() {
-    if (!confirm('Обнулить текущую игру? Счёт будет стёрт.')) { return; }
+    if (!confirm('Сбросить игру? Она будет удалена без сохранения.')) { return; }
 
-    var game = loadCurrentGame();
-    if (!game) { return; }
+    // Remove all keys the start screen uses to detect an active game.
+    localStorage.removeItem('currentGame');
+    localStorage.removeItem('playerNames');
+    localStorage.removeItem('gameMode');
+    localStorage.removeItem('gameSize');
+    localStorage.removeItem('currentDealer');
 
-    game.rounds = [];
-    game.currentDealer = 0;
-    localStorage.setItem('currentGame', JSON.stringify(game));
-    localStorage.setItem('currentDealer', '0');
-
-    // Clear the score table DOM
-    document.getElementById('scoreTable').getElementsByTagName('tbody')[0].innerHTML = '';
-
-    // Hide winner banner
-    var banner = document.getElementById('winnerBanner');
-    if (banner) { banner.style.display = 'none'; banner.innerHTML = ''; }
-
-    // Show dealer for the first round (sets localStorage.currentDealer to 1)
-    updateDealer();
-    updateResults();
+    window.location.href = 'index.html';
 }
 
 /* ── Initialisation ─────────────────────────────────────────────────────── */
