@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Настройка игры Клабор</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -14,13 +15,17 @@
     <input type="radio" id="score1001" name="gameSize" value="1001">
     <label for="score1001">1001</label>
 
-    <h3>Введите имена игроков:</h3>
-    <div id="playerNames">
-        <input type="text" name="playerName" placeholder="Имя игрока">
-        <input type="text" name="playerName" placeholder="Имя игрока">
-        <input type="text" name="playerName" placeholder="Имя игрока">
-    </div>
-    <button type="button" onclick="addPlayer()">+</button>
+    <p>Режим игры:</p>
+    <input type="radio" id="modeIndividual" name="gameMode" value="individual" checked>
+    <label for="modeIndividual">Каждый сам за себя (2–3 игрока)</label>
+    <br>
+    <input type="radio" id="modePairs" name="gameMode" value="pairs">
+    <label for="modePairs">Пара на пару (2×2)</label>
+
+    <h3 id="playersHeading">Введите имена игроков:</h3>
+    <p class="hint" id="playersHint"></p>
+    <div id="playerNames"><!-- заполняется из setup.js по режиму --></div>
+    <button type="button" id="addPlayerBtn" onclick="addPlayer()">+</button>
     <button type="submit">Начать игру</button>
 </form>
 

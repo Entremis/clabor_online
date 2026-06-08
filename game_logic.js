@@ -1,16 +1,41 @@
 window.onload = function() {
     var playerNames = JSON.parse(localStorage.getItem('playerNames'));
+    var mode = getMode();
     var gameForm = document.getElementById('gameForm');
+
     playerNames.forEach(function(name, index) {
         var div = document.createElement('div');
+        var scoreAttrs = 'type="number" inputmode="numeric" name="score' + index + '" placeholder="Очки"';
+        if (mode === 'pairs') {
+            scoreAttrs += ' oninput="onPairScoreInput(\'score' + index + '\')"';
+        }
         div.innerHTML = '<label>' + name + '</label>' +
                         '<input type="radio" name="played" value="' + index + '"> Выбирал масть' +
-                        '<input type="number" name="score' + index + '" placeholder="Очки">';
+                        '<input ' + scoreAttrs + '>';
         gameForm.appendChild(div);
     });
+
+    document.getElementById('targetScore').innerText = String(getTarget());
+
+    // Банк раздачи нужен только в режиме «пара на пару».
+    if (mode === 'pairs') {
+        document.getElementById('bankControls').style.display = 'block';
+        updateBankDisplay();
+    }
+
     updateDealer();
     updateResults();
 };
+
+// Режим игры: 'individual' или 'pairs' (по умолчанию individual).
+function getMode() {
+    return localStorage.getItem('gameMode') || 'individual';
+}
+
+// Целевой счёт игры (501 / 1001, по умолчанию 501)
+function getTarget() {
+    return parseInt(localStorage.getItem('gameSize'), 10) || 501;
+}
 
 function recordScores() {
     var playerNames = JSON.parse(localStorage.getItem('playerNames'));
@@ -37,7 +62,7 @@ function recordScores() {
         newCell.innerHTML = `<input type="number" value="${player.score}" class="editable" data-player="${player.name}" data-round="${currentRound}" onchange="handleInputChange(this)">`;
 
         newCell = newRow.insertCell(); // Итоговые очки
-        newCell.innerText = ''; // Оставляем пустым, будет пересчитано позже
+        newCell.innerText = '';
 
         newCell = newRow.insertCell();
         newCell.className = "beit";
@@ -219,6 +244,9 @@ function updateResults() {
     var resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = '';
 
+    var target = getTarget();
+    var standings = [];
+
     playerNames.forEach(function(name, index) {
         var lastScore = 0;
         var maxBeit = 0;
@@ -226,7 +254,7 @@ function updateResults() {
         for (var i = 0; i < scoreTable.rows.length; i++) {
             var row = scoreTable.rows[i];
             if (row.cells[1].innerText === name) {
-                lastScore = parseInt(row.cells[3].innerText, 10);
+                lastScore = parseInt(row.cells[3].innerText, 10) || 0;
                 var beit = row.cells[4].innerText === '-' ? 0 : parseInt(row.cells[4].innerText, 10);
                 if (beit > maxBeit) {
                     maxBeit = beit;
@@ -234,8 +262,81 @@ function updateResults() {
             }
         }
 
+        standings.push({ name: name, score: lastScore, beit: maxBeit });
+
         var resultItem = document.createElement('div');
         resultItem.innerText = name + ' Очки: ' + lastScore + ', Бейт: ' + maxBeit;
         resultsDiv.appendChild(resultItem);
     });
+
+    showWinner(standings, target);
+}
+
+// Победитель: первый, кто достиг целевого счёта. Строка = игрок (или пара в режиме «пара на пару»).
+function showWinner(standings, target) {
+    var banner = document.getElementById('winnerBanner');
+    if (!banner) { return; }
+
+    var reached = standings.filter(function(s) { return s.score >= target; });
+    if (reached.length === 0) {
+        banner.style.display = 'none';
+        banner.innerText = '';
+        return;
+    }
+
+    reached.sort(function(a, b) { return b.score - a.score; });
+    var winner = reached[0];
+    banner.style.display = 'block';
+    banner.innerText = '🏆 Победитель: ' + winner.name + ' — ' + winner.score + ' очков (игра до ' + target + ')';
+}
+
+/* ============== Банк раздачи и авторасчёт очков пары (режим «пара на пару») ============== */
+// Банк = 162 (голая игра) + объявления. Зная очки одной пары, вторая = банк − первая.
+
+var calcDecls = { terz: 0, fifty: 0 };
+var lastEditedScore = 'score0';
+
+function getBank() {
+    var bellaEl = document.getElementById('bella');
+    var bella = (bellaEl && bellaEl.checked) ? 20 : 0;
+    return 162 + calcDecls.terz * 20 + calcDecls.fifty * 50 + bella;
+}
+
+function updateBankDisplay() {
+    var bankEl = document.getElementById('bankTotal');
+    if (bankEl) { bankEl.innerText = String(getBank()); }
+}
+
+function changeDecl(type, delta) {
+    calcDecls[type] = Math.max(0, calcDecls[type] + delta);
+    var el = document.getElementById(type === 'terz' ? 'terzCount' : 'fiftyCount');
+    if (el) { el.innerText = String(calcDecls[type]); }
+    onDeclChange();
+}
+
+// Изменили объявления — обновить банк и пересчитать очки второй пары.
+function onDeclChange() {
+    updateBankDisplay();
+    recomputeOtherPairScore();
+}
+
+// Ввели очки одной пары — посчитать вторую (банк − введённое). Можно поправить вручную.
+function onPairScoreInput(which) {
+    lastEditedScore = which;
+    recomputeOtherPairScore();
+}
+
+function recomputeOtherPairScore() {
+    if (getMode() !== 'pairs') { return; }
+    var s0 = document.querySelector('input[name="score0"]');
+    var s1 = document.querySelector('input[name="score1"]');
+    if (!s0 || !s1) { return; }
+
+    var src = lastEditedScore === 'score0' ? s0 : s1;
+    var dst = lastEditedScore === 'score0' ? s1 : s0;
+    if (src.value === '') { return; }
+
+    var bank = getBank();
+    var v = parseInt(src.value, 10) || 0;
+    dst.value = bank - v;
 }

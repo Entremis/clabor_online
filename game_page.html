@@ -2,20 +2,48 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Игра Клабор</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<h2>Игра</h2>
+<h2>Игра <span class="target-label">до <span id="targetScore"></span> очков</span></h2>
 <div class="tabs">
     <button class="tab-button" onclick="openTab('game')">Игра</button>
     <button class="tab-button" onclick="openTab('scores')">Детальный счет</button>
 </div>
 
 <div id="game" class="tab-content">
-    <h3>Раздает игрок: <span id="dealerName"></span></h3>
+    <div id="winnerBanner" class="winner-banner" style="display:none;"></div>
+
+    <!-- Банк раздачи: показывается только в режиме «пара на пару» -->
+    <div id="bankControls" class="calc" style="display:none;">
+        <div class="calc-body">
+            <div class="calc-decls">
+                <div class="decl">
+                    <span>Терц (+20)</span>
+                    <button type="button" onclick="changeDecl('terz',-1)">−</button>
+                    <span id="terzCount" class="decl-count">0</span>
+                    <button type="button" onclick="changeDecl('terz',1)">+</button>
+                </div>
+                <div class="decl">
+                    <span>Полтинна (+50)</span>
+                    <button type="button" onclick="changeDecl('fifty',-1)">−</button>
+                    <span id="fiftyCount" class="decl-count">0</span>
+                    <button type="button" onclick="changeDecl('fifty',1)">+</button>
+                </div>
+                <div class="decl">
+                    <label><input type="checkbox" id="bella" onchange="onDeclChange()"> Белла (+20)</label>
+                </div>
+            </div>
+            <div class="calc-total">Банк раздачи: <strong id="bankTotal">162</strong></div>
+            <p class="hint">Введи очки одной пары — у второй посчитается само. Можно поправить вручную.</p>
+        </div>
+    </div>
+
+    <h3>Раздает: <span id="dealerName"></span></h3>
     <form id="gameForm">
-        <!-- Динамически добавляемые элементы управления для каждого игрока -->
+        <!-- Динамически добавляемые элементы управления для каждого игрока/пары -->
     </form>
     <button onclick="recordScores()">Записать очки</button>
     <div id="results">
@@ -31,7 +59,7 @@
                 <th>Партия</th>
                 <th>Игрок</th>
                 <th>Набранные очки</th>
-                <th>Итоговые очки</th> <!-- Новая колонка -->
+                <th>Итоговые очки</th>
                 <th>Бейт</th>
                 <th>Играл</th>
                 <th>Действия</th>
