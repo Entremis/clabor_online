@@ -70,6 +70,103 @@ function deferGame() {
     window.location.href = 'index.html';
 }
 
+/* ── History helpers ────────────────────────────────────────────────────── */
+
+// Compute per-player standings from the current DOM table.
+function computeCurrentStandings() {
+    var playerNames = JSON.parse(localStorage.getItem('playerNames'));
+    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
+    return playerNames.map(function(name) {
+        var lastScore = 0;
+        var maxBeit = 0;
+        for (var i = 0; i < scoreTable.rows.length; i++) {
+            var row = scoreTable.rows[i];
+            if (row.cells[1].innerText === name) {
+                lastScore = parseInt(row.cells[3].innerText, 10) || 0;
+                var beit = row.cells[4].innerText === '-' ? 0 : parseInt(row.cells[4].innerText, 10);
+                if (beit > maxBeit) { maxBeit = beit; }
+            }
+        }
+        return { name: name, score: lastScore, beit: maxBeit };
+    });
+}
+
+// Snapshot rounds from the DOM including computed finalScore and beit for the history record.
+function buildRoundsSnapshot() {
+    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
+    var rounds = {};
+    for (var i = 0; i < scoreTable.rows.length; i++) {
+        var row = scoreTable.rows[i];
+        var roundNum = parseInt(row.cells[0].innerText, 10);
+        if (!rounds[roundNum]) { rounds[roundNum] = []; }
+        rounds[roundNum].push({
+            name: row.cells[1].innerText,
+            score: parseInt(row.cells[2].querySelector('input').value, 10) || 0,
+            finalScore: parseInt(row.cells[3].innerText, 10) || 0,
+            beit: row.cells[4].innerText,
+            played: row.cells[5].querySelector('select').value
+        });
+    }
+    var roundNums = Object.keys(rounds).map(Number).sort(function(a, b) { return a - b; });
+    return roundNums.map(function(n) { return rounds[n]; });
+}
+
+function finishGame() {
+    if (!confirm('Закрыть игру и сохранить в историю?')) { return; }
+
+    var game = loadCurrentGame();
+    if (!game) { return; }
+
+    var standings = computeCurrentStandings();
+    var sorted = standings.slice().sort(function(a, b) { return b.score - a.score; });
+    var winner = sorted.length > 0 ? { name: sorted[0].name, score: sorted[0].score } : null;
+
+    var historyEntry = {
+        id: game.id,
+        startedAt: game.startedAt,
+        finishedAt: new Date().toISOString(),
+        mode: game.mode,
+        target: game.target,
+        players: game.players,
+        rounds: buildRoundsSnapshot(),
+        winner: winner,
+        standings: standings,
+        finished: true
+    };
+
+    var rawHistory = localStorage.getItem('gameHistory');
+    var history;
+    try { history = rawHistory ? JSON.parse(rawHistory) : []; } catch (e) { history = []; }
+    history.unshift(historyEntry);
+    localStorage.setItem('gameHistory', JSON.stringify(history));
+
+    localStorage.removeItem('currentGame');
+    window.location.href = 'index.html';
+}
+
+function resetGame() {
+    if (!confirm('Обнулить текущую игру? Счёт будет стёрт.')) { return; }
+
+    var game = loadCurrentGame();
+    if (!game) { return; }
+
+    game.rounds = [];
+    game.currentDealer = 0;
+    localStorage.setItem('currentGame', JSON.stringify(game));
+    localStorage.setItem('currentDealer', '0');
+
+    // Clear the score table DOM
+    document.getElementById('scoreTable').getElementsByTagName('tbody')[0].innerHTML = '';
+
+    // Hide winner banner
+    var banner = document.getElementById('winnerBanner');
+    if (banner) { banner.style.display = 'none'; banner.innerHTML = ''; }
+
+    // Show dealer for the first round (sets localStorage.currentDealer to 1)
+    updateDealer();
+    updateResults();
+}
+
 /* ── Initialisation ─────────────────────────────────────────────────────── */
 
 window.onload = function() {
@@ -370,6 +467,7 @@ function updateResults() {
 }
 
 // Победитель: первый, кто достиг целевого счёта.
+// При достижении порога показывает кнопку «Завершить и сохранить в историю».
 function showWinner(standings, target) {
     var banner = document.getElementById('winnerBanner');
     if (!banner) { return; }
@@ -377,14 +475,16 @@ function showWinner(standings, target) {
     var reached = standings.filter(function(s) { return s.score >= target; });
     if (reached.length === 0) {
         banner.style.display = 'none';
-        banner.innerText = '';
+        banner.innerHTML = '';
         return;
     }
 
     reached.sort(function(a, b) { return b.score - a.score; });
     var winner = reached[0];
     banner.style.display = 'block';
-    banner.innerText = '🏆 Победитель: ' + winner.name + ' — ' + winner.score + ' очков (игра до ' + target + ')';
+    banner.innerHTML =
+        '<div>🏆 Победитель: ' + winner.name + ' — ' + winner.score + ' очков (игра до ' + target + ')</div>' +
+        '<button onclick="finishGame()" class="finish-btn">Завершить и сохранить в историю</button>';
 }
 
 /* ── Банк раздачи (режим «пара на пару») ────────────────────────────────── */

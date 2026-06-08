@@ -45,10 +45,20 @@
     <form id="gameForm">
         <!-- Динамически добавляемые элементы управления для каждого игрока/пары -->
     </form>
-    <button onclick="recordScores()">Записать очки</button>
-    <button onclick="deferGame()" class="defer-btn">Отложить</button>
+
+    <div class="primary-actions">
+        <button onclick="recordScores()">Записать очки</button>
+        <button onclick="deferGame()" class="defer-btn">Отложить</button>
+    </div>
+
     <div id="results">
         <!-- Результаты будут обновляться здесь -->
+    </div>
+
+    <!-- Опасная зона: визуально отделена от основных действий -->
+    <div class="danger-zone">
+        <button onclick="resetGame()" class="reset-btn">Сбросить</button>
+        <button onclick="finishGame()" class="close-game-btn">Закрыть игру</button>
     </div>
 </div>
 

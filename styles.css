@@ -218,3 +218,146 @@ tr:nth-child(even) {
 .defer-btn:hover {
     background-color: #545b62;
 }
+
+/* Кнопка «Сбросить» — оранжевая */
+.reset-btn {
+    background-color: #fd7e14;
+}
+
+.reset-btn:hover {
+    background-color: #e8600a;
+}
+
+/* Кнопка «Закрыть игру» — красная */
+.close-game-btn {
+    background-color: #dc3545;
+}
+
+.close-game-btn:hover {
+    background-color: #b02a37;
+}
+
+/* Кнопка «Завершить и сохранить» в баннере победителя */
+.finish-btn {
+    margin-top: 8px;
+    background-color: #28a745;
+}
+
+.finish-btn:hover {
+    background-color: #1e7e34;
+}
+
+/* Секция опасных действий — отделена линией */
+.danger-zone {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.danger-zone button {
+    margin: 0;
+}
+
+/* Кнопка «История игр» на стартовом экране */
+.history-link-btn {
+    background-color: #6c757d;
+}
+
+.history-link-btn:hover {
+    background-color: #545b62;
+}
+
+/* Кнопка «← Назад» на странице истории */
+.back-btn {
+    background-color: #6c757d;
+    margin-bottom: 20px;
+}
+
+.back-btn:hover {
+    background-color: #545b62;
+}
+
+/* ── История игр ──────────────────────────────────────────────────────── */
+
+.history-card {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 12px 14px;
+    background-color: #f8f9fa;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.history-meta {
+    flex: 1;
+    min-width: 200px;
+}
+
+.history-players {
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.history-info {
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.history-winner {
+    color: #155724;
+    font-size: 15px;
+    margin-bottom: 2px;
+}
+
+.history-scores {
+    color: #444;
+    font-size: 13px;
+}
+
+.history-actions {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    flex-shrink: 0;
+}
+
+.history-actions button {
+    margin: 0;
+    padding: 6px 14px;
+    font-size: 14px;
+}
+
+.expand-btn {
+    background-color: #6c757d;
+}
+
+.expand-btn:hover {
+    background-color: #545b62;
+}
+
+.delete-btn {
+    background-color: #dc3545;
+}
+
+.delete-btn:hover {
+    background-color: #b02a37;
+}
+
+.history-details {
+    padding: 12px 14px;
+    border-top: 1px solid #ddd;
+    overflow-x: auto;
+}
