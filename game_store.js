@@ -72,6 +72,14 @@
             history.entries.splice(index, 1);
             write('gameHistory', JSON.stringify(history.entries));
         }
+        function replaceHistory(entries, expected) {
+            const history = readHistory();
+            if (history.token !== expected) throw new Error('История изменилась в другой вкладке. Обновите страницу.');
+            if (!Array.isArray(entries)) throw new Error('Не удалось сохранить историю: неизвестный формат.');
+            const token = JSON.stringify(entries);
+            write('gameHistory', token);
+            return { entries: engine.clone(entries), token };
+        }
         function readLibrary() {
             const token = read('playerLibrary');
             return { library: token === null ? { version:1, profiles:[], lineups:[] } : parse(token, 'Профили'), token };
@@ -82,7 +90,7 @@
             write('playerLibrary', token);
             return { library: engine.clone(library), token };
         }
-        return { readCurrent, save, readHistory, archive, archiveAndRematch, discard, deleteHistory, readLibrary, saveLibrary };
+        return { readCurrent, save, readHistory, archive, archiveAndRematch, discard, deleteHistory, replaceHistory, readLibrary, saveLibrary };
     }
     return { createStore };
 });

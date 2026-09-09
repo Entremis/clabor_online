@@ -36,10 +36,31 @@ function buildHistoryTable(game) {
     });
     wrapper.append(table); return wrapper;
 }
+async function renderLegacyTools(history) {
+    const panel=document.getElementById('legacyLinkPanel'),summary=document.getElementById('legacyLinkSummary');
+    const {library}=await historyStore.readLibrary();
+    const proposal=ClaborPlayers.linkKnownLegacyHistory(history.entries,library.profiles);
+    const linked=history.entries.filter(game=>game?.legacyLinked).length;
+    panel.hidden=!(proposal.linked||linked);
+    if(panel.hidden) return;
+    summary.textContent='По подтверждённому сопоставлению можно добавить в статистику '+proposal.linked+' старых игр. Игры с Настей и остальные нераспознанные команды останутся только в истории.';
+    const link=document.getElementById('linkLegacyHistory'),unlink=document.getElementById('unlinkLegacyHistory');
+    link.hidden=!proposal.linked;unlink.hidden=!linked;
+    link.onclick=async()=>{
+        if(!await askConfirmation('Привязать '+proposal.linked+' старых игр к профилям? Это можно отменить этой же кнопкой.')) return;
+        await historyStore.replaceHistory(proposal.entries,history.token);await renderHistory();
+    };
+    unlink.onclick=async()=>{
+        if(!await askConfirmation('Убрать привязку '+linked+' старых игр? Сами игры останутся в истории.')) return;
+        const result=ClaborPlayers.unlinkKnownLegacyHistory(history.entries);
+        await historyStore.replaceHistory(result.entries,history.token);await renderHistory();
+    };
+}
 async function renderHistory() {
     const container = document.getElementById('historyList'); container.replaceChildren();
     try {
         const history = await historyStore.readHistory();
+        await renderLegacyTools(history);
         if (!history.entries.length) container.append(historyElement('p', 'Завершённых игр ещё нет.'));
         history.entries.forEach((game, index) => {
             if (!game || !Array.isArray(game.players)) {

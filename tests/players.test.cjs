@@ -34,6 +34,23 @@ test('legacy rematch preserves labels without claiming profile ownership',()=>{
     const game=P.rematch({players:['А','Б'],mode:'individual',target:1001},library().profiles);
     assert.equal(game.target,1001); assert.equal(game.players[0].memberIds,undefined);
 });
+test('confirmed old aliases link only approved individual and pair history',()=>{
+    const lib=library(['Дима','Яна','Анжела','Алеша']);
+    const legacy=(id,mode,players)=>({id,mode,target:501,players,finishedAt:'2026-09-01T12:00:00Z',
+        standings:players.map((name,index)=>({id:id+'-'+index,name,score:index?300:600,beit:0})),winner:{id:id+'-0'}});
+    const entries=[
+        legacy('solo','individual',['Я','Анжик','Леха']),
+        legacy('teams','pairs',['Мы','Они']),
+        legacy('skip','pairs',['Дима Настя','Дима Яна'])
+    ];
+    const result=P.linkKnownLegacyHistory(entries,lib.profiles);
+    assert.equal(result.linked,2);assert.equal(result.skipped,1);
+    assert.deepEqual(result.entries[0].roster.slots.map(slot=>slot.memberIds[0]),[lib.profiles[0].id,lib.profiles[2].id,lib.profiles[3].id]);
+    assert.deepEqual(result.entries[1].roster.slots.map(slot=>slot.memberIds),[[lib.profiles[0].id,lib.profiles[2].id],[lib.profiles[1].id,lib.profiles[3].id]]);
+    assert.equal(result.entries[2].roster,undefined);assert.equal(P.statistics(result.entries,lib.profiles).games,2);
+    const undone=P.unlinkKnownLegacyHistory(result.entries);
+    assert.equal(undone.unlinked,2);assert.ok(undone.entries.every(game=>!game.roster));
+});
 test('statistics follows renamed and archived IDs, separates modes and excludes unfinished/legacy games',()=>{
     const lib=library(), solo=entry(lib), pair=entry(lib,'pairs');
     const old={...solo,id:'old',roster:undefined}, unfinished={...solo,id:'unfinished',status:'closed',winner:null};
