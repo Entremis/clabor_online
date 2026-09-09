@@ -72,6 +72,51 @@
         next.lineups.push({ ...engine.clone(roster), id: engine.id(), name, updatedAt: new Date().toISOString() });
         return next;
     }
+    function legacyLabel(value) {
+        return String(value || '').trim().toLocaleLowerCase('ru').replace(/\s+/g, ' ');
+    }
+    function legacyRoster(entry, profiles) {
+        const byName = new Map(profiles.map(profile => [legacyLabel(profile.name), profile.id]));
+        const profile = name => byName.get(legacyLabel(name));
+        const aliases = {
+            'дима':['я','д','дима','dima','димик','димкинс','dimonchik','димо','da'],
+            'яна':['яна','yana','ya'],
+            'анжела':['анжела','энжи','анжи','анжик','анжелка','анжеликс','энжикс','эенжи','анжело','mc angy','а'],
+            'алеша':['алеша','алёша','леха','леша','лехо','l']
+        };
+        const individual = Object.entries(aliases).reduce((all,[name,values]) => {
+            values.forEach(value => all.set(legacyLabel(value),profile(name))); return all;
+        },new Map());
+        const teams = {
+            'мы':['дима','анжела'], 'они':['яна','алеша'],
+            'ля':['алеша','яна'], 'ад':['анжела','дима']
+        };
+        const labels = Array.isArray(entry.players) ? entry.players.map(player => typeof player === 'string' ? player : player?.name) : [];
+        let slots;
+        if (entry.mode === 'individual') slots = labels.map(label => [individual.get(legacyLabel(label))]);
+        else if (entry.mode === 'pairs') slots = labels.map(label => (teams[legacyLabel(label)] || []).map(profile));
+        else return null;
+        const expected = entry.mode === 'pairs' ? 2 : 1;
+        const members = slots.flat();
+        if (slots.length !== labels.length || slots.some(slot => slot.length !== expected || slot.some(id => !id)) ||
+            new Set(members).size !== members.length) return null;
+        return {mode:entry.mode,target:entry.target,slots:slots.map(memberIds => ({memberIds}))};
+    }
+    function linkKnownLegacyHistory(entries, profiles) {
+        const next=engine.clone(entries); let linked=0,skipped=0;
+        next.forEach(entry => {
+            if (!entry || entry.roster || !entry.winner || entry.status === 'empty' || entry.status === 'closed') return;
+            const roster=legacyRoster(entry,profiles);
+            if (!roster) { skipped++; return; }
+            entry.roster=roster;entry.legacyLinked=true;linked++;
+        });
+        return {entries:next,linked,skipped};
+    }
+    function unlinkKnownLegacyHistory(entries) {
+        const next=engine.clone(entries);let unlinked=0;
+        next.forEach(entry => {if(entry?.legacyLinked){delete entry.roster;delete entry.legacyLinked;unlinked++;}});
+        return {entries:next,unlinked};
+    }
     function statistics(entries, profiles, options = {}) {
         const mode = options.mode || 'all';
         const since = options.since || 0;
@@ -114,5 +159,5 @@
             .sort((a,b) => b.wins - a.wins || b.winRate - a.winRate || a.name.localeCompare(b.name, 'ru'));
         return { people: finish(people), teams: finish(teams), games:eligible, unlinked, closed };
     }
-    return { empty, validate, addProfile, validateRoster, createGame, rosterFromGame, rematch, saveLineup, profileLabel, statistics };
+    return { empty, validate, addProfile, validateRoster, createGame, rosterFromGame, rematch, saveLineup, profileLabel, legacyRoster, linkKnownLegacyHistory, unlinkKnownLegacyHistory, statistics };
 });

@@ -70,7 +70,7 @@
         });
         const api = {};
         const reads = ['readCurrent', 'readHistory', 'readLibrary'];
-        const methods = [...reads, 'save', 'archive', 'archiveAndRematch', 'discard', 'deleteHistory', 'saveLibrary'];
+        const methods = [...reads, 'save', 'archive', 'archiveAndRematch', 'discard', 'deleteHistory', 'replaceHistory', 'saveLibrary'];
         for (const method of methods) api[method] = async (...args) => {
             const changed = new Set();
             const result = await db.transaction(reads.includes(method) ? 'r' : 'rw', db.kv, async () => {
