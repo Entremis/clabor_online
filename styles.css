@@ -1,5 +1,8 @@
 :root { color-scheme: light; --bg:#f6f8fc; --surface:#fff; --surface-alt:#eef2f7; --text:#202c3d; --muted:#52637a; --border:#ccd5e0; --accent:#185e4e; --accent-hover:#104838; --link:#175dba; --notice:#fff6d8; --notice-text:#715610; --success:#e1f3e8; --success-text:#185438; --error:#ad2626; }
 :root[data-theme="dark"] { color-scheme:dark; --bg:#141a24; --surface:#1c2634; --surface-alt:#243143; --text:#edf2f8; --muted:#b0bdd0; --border:#425269; --accent:#24765f; --accent-hover:#31886f; --link:#9ac4ff; --notice:#3d341b; --notice-text:#ffe29b; --success:#1c3c2e; --success-text:#b1efc6; --error:#ffb1ab; }
+.auth-field { display:flex; flex-direction:column; gap:6px; margin:14px 0; }
+.auth-field input { width:100%; margin:0; padding:12px; border:1px solid var(--border); border-radius:8px; color:var(--text); background:var(--surface); }
+#conflictList pre { white-space:pre-wrap; max-height:240px; overflow:auto; background:var(--surface-alt); padding:12px; }
 body {
     font-family: Arial, sans-serif;
     margin: 20px;

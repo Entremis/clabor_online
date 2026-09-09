@@ -1,0 +1,18 @@
+<!DOCTYPE html><html lang="ru"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><meta name="theme-color" content="#f6f8fc">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Общий аккаунт — Клабор</title><link rel="stylesheet" href="styles.css"><script src="cloud_config.js"></script><script src="app_shell.js"></script></head><body>
+<h1>Общий аккаунт</h1><p>Один аккаунт для вашей компании. Войдите с тем же логином на других телефонах — игроки, составы и история будут общими.</p>
+<p id="accountError" class="error-message" role="alert"></p>
+<section id="signedIn" class="panel" hidden><h2 id="accountName"></h2><p id="accountSync" role="status"></p><button id="syncNow">Синхронизировать</button><button id="signOut" class="secondary">Выйти из аккаунта</button><p class="hint">При выходе локальная копия останется на этом устройстве и будет доступна после входа в тот же аккаунт.</p><a href="index.html">К игре</a></section>
+<form id="authForm" class="panel" hidden><fieldset id="authFields"><legend>Вход или регистрация</legend>
+<label class="caller-label"><input type="radio" name="authMode" value="login" checked>Войти</label><label class="caller-label"><input type="radio" name="authMode" value="register">Создать аккаунт</label>
+<label class="auth-field">Логин компании<input id="accountLogin" type="text" required minlength="3" maxlength="32" pattern="[a-zA-Z0-9._-]{3,32}" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+<p class="hint">От 3 до 32 латинских букв, цифр, точек, дефисов или подчёркиваний.</p>
+<label class="auth-field">Пароль<input id="accountPassword" type="password" required minlength="8" maxlength="128" autocomplete="current-password"></label>
+<label id="confirmPasswordField" class="auth-field" hidden>Повторите пароль<input id="confirmPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password"></label>
+<label id="importField" class="caller-label" hidden><input id="importLocal" type="checkbox">Перенести прежние игры и игроков этого устройства в аккаунт</label><p id="localSummary" class="hint"></p>
+<button type="submit" id="authSubmit">Войти</button><p class="hint">Для первого входа нужен интернет. Потом можно играть без сети.</p></fieldset></form>
+<section id="legacyImportPanel" class="panel" hidden><h2>Прежние сохранения</h2><p>На этом устройстве остались игры и игроки из версии без аккаунта. Их можно добавить в текущую компанию.</p><button id="importAfterLogin">Перенести в этот аккаунт</button></section>
+<section id="conflictsPanel" hidden><h2>Разные версии записей</h2><p>Эта запись менялась на двух устройствах. Сравните варианты и выберите нужный. Копия обоих вариантов останется на этом устройстве.</p><div id="conflictList"></div></section>
+<script src="confirmation.js"></script><script src="vendor/dexie.min.js"></script><script src="game_engine.js"></script><script src="game_store.js"></script><script src="player_library.js"></script><script src="sync_model.js"></script><script src="database.js"></script><script src="cloud_client.js"></script><script src="account.js"></script></body></html>
