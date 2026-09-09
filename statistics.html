@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f6f8fc"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Статистика — Клабор</title><link rel="stylesheet" href="styles.css"><script src="app_shell.js"></script>
+</head>
+<body>
+<h1>Статистика</h1>
+<p id="statisticsError" class="error-message" role="alert"></p>
+<div class="panel filter-row">
+  <label>Режим <select id="statsMode"><option value="all">Все игры</option><option value="individual">Каждый за себя</option><option value="pairs">Пара на пару</option></select></label>
+  <label>Период <select id="statsPeriod"><option value="0">За всё время</option><option value="30">Последние 30 дней</option><option value="365">Последний год</option></select></label>
+</div>
+<p id="statsSummary" role="status">Загружаем результаты…</p>
+<p id="statsNote" class="hint"></p>
+<div id="statsContent" hidden>
+<section class="panel"><h2>Игроки</h2><div id="peopleTable" class="table-scroll" tabindex="0" role="region" aria-label="Статистика игроков"></div>
+<p class="hint">В парной игре каждому участнику засчитываются победа, итоговые очки и бейты его команды. Фильтр режима разделяет личные и парные результаты.</p></section>
+<section class="panel"><h2>Победы игроков</h2><div id="winsChart"></div></section>
+<section class="panel"><h2>Очки по играм</h2><label>Игрок <select id="chartPlayer"></select></label><div id="scoreChart"></div><p class="hint">Итоговый счёт в каждой из последних 20 игр выбранного периода. Отрицательные результаты учитываются.</p></section>
+<section id="teamsSection" class="panel"><h2>Парные команды</h2><div id="teamsTable" class="table-scroll" tabindex="0" role="region" aria-label="Статистика команд"></div></section>
+</div>
+<script src="confirmation.js"></script><script src="vendor/dexie.min.js"></script><script src="game_engine.js"></script><script src="game_store.js"></script><script src="database.js"></script><script src="player_library.js"></script><script src="statistics.js"></script>
+</body></html>

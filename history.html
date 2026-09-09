@@ -3,15 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f6f8fc"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>История игр — Клабор</title>
 <link rel="stylesheet" href="styles.css">
+<script src="app_shell.js"></script>
 </head>
 <body>
 <h2>История игр</h2>
+<p id="historyError" class="error-message" role="alert"></p>
 <button onclick="window.location.href='index.html'" class="back-btn">← Назад</button>
 
 <div id="historyList"><!-- заполняется из history.js --></div>
 
+<script src="confirmation.js"></script>
+<script src="vendor/dexie.min.js"></script>
+<script src="game_engine.js"></script>
+<script src="game_store.js"></script>
+<script src="database.js"></script>
+<script src="player_library.js"></script>
 <script src="history.js"></script>
 </body>
 </html>

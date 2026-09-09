@@ -1,113 +1,97 @@
-function loadHistory() {
-    var raw = localStorage.getItem('gameHistory');
-    if (!raw) { return []; }
-    try { return JSON.parse(raw); } catch (e) { return []; }
+'use strict';
+let historyStore;
+function historyElement(tag, text, className) {
+    const node = document.createElement(tag);
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    if (className) node.className = className;
+    return node;
 }
-
-function deleteGame(idx) {
-    if (!confirm('Удалить эту игру из истории?')) { return; }
-    var history = loadHistory();
-    history.splice(idx, 1);
-    localStorage.setItem('gameHistory', JSON.stringify(history));
-    renderHistory();
+function formatDate(value) {
+    const date = new Date(value);
+    return !value || Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
 }
-
-function toggleDetails(idx) {
-    var tableDiv = document.getElementById('table-' + idx);
-    var btn = document.getElementById('expand-btn-' + idx);
-    if (!tableDiv) { return; }
-    if (tableDiv.style.display === 'none') {
-        tableDiv.style.display = 'block';
-        if (btn) { btn.innerText = 'Детали ▴'; }
-    } else {
-        tableDiv.style.display = 'none';
-        if (btn) { btn.innerText = 'Детали ▾'; }
-    }
-}
-
-function formatDate(isoString) {
-    if (!isoString) { return '—'; }
-    var d = new Date(isoString);
-    return d.toLocaleDateString('ru-RU') + ' ' +
-           d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-}
-
-function formatMode(mode) {
-    return mode === 'pairs' ? 'Пара на пару' : 'Каждый сам за себя';
-}
-
 function buildHistoryTable(game) {
-    if (!game.rounds || game.rounds.length === 0) {
-        return '<p class="hint">Нет сыгранных партий.</p>';
+    const wrapper = historyElement('div', null, 'history-details');
+    if (!Array.isArray(game.rounds) || !game.rounds.length) {
+        wrapper.append(historyElement('p', 'Нет сыгранных раздач.', 'hint')); return wrapper;
     }
-
-    var html = '<table><thead><tr>' +
-        '<th>Партия</th><th>Игрок</th><th>Набранные очки</th>' +
-        '<th>Итоговые очки</th><th>Бейт</th><th>Играл</th>' +
-        '</tr></thead><tbody>';
-
-    game.rounds.forEach(function(roundEntries, roundIdx) {
-        var roundNum = roundIdx + 1;
-        roundEntries.forEach(function(entry) {
-            html += '<tr>' +
-                '<td>' + roundNum + '</td>' +
-                '<td>' + entry.name + '</td>' +
-                '<td>' + entry.score + '</td>' +
-                '<td>' + (entry.finalScore !== undefined ? entry.finalScore : '') + '</td>' +
-                '<td>' + (entry.beit !== undefined ? entry.beit : '-') + '</td>' +
-                '<td>' + (entry.played || '') + '</td>' +
-                '</tr>';
+    const table = historyElement('table');
+    const head = table.createTHead().insertRow();
+    ['Раздача', 'Игрок', 'Набрано', 'Всего', 'Бейт', 'Играл'].forEach(title => {
+        const th = historyElement('th', title); th.scope = 'col'; head.append(th);
+    });
+    const body = table.createTBody();
+    game.rounds.forEach((entries, index) => {
+        if (!Array.isArray(entries)) return;
+        entries.forEach(entry => {
+            if (!entry || typeof entry !== 'object') return;
+            const row = body.insertRow();
+            [index + 1, entry.name, entry.score, entry.finalScore ?? '—', entry.beit ?? '—', entry.played].forEach(value => {
+                row.insertCell().textContent = value == null ? '—' : String(value);
+            });
         });
+        if (Array.isArray(game.roundNotes) && typeof game.roundNotes[index] === 'string' && game.roundNotes[index]) {
+            const cell = body.insertRow().insertCell(); cell.colSpan = 6; cell.textContent = game.roundNotes[index];
+        }
     });
-
-    html += '</tbody></table>';
-    return html;
+    wrapper.append(table); return wrapper;
 }
-
-function renderHistory() {
-    var history = loadHistory();
-    var container = document.getElementById('historyList');
-    container.innerHTML = '';
-
-    if (history.length === 0) {
-        container.innerHTML = '<p>Завершённых игр ещё нет.</p>';
-        return;
-    }
-
-    history.forEach(function(game, idx) {
-        var card = document.createElement('div');
-        card.className = 'history-card';
-
-        var winnerText = game.winner
-            ? game.winner.name + ' — ' + game.winner.score + ' очков'
-            : '—';
-
-        var standingsText = (game.standings || [])
-            .map(function(s) { return s.name + ': ' + s.score; })
-            .join(' / ');
-
-        card.innerHTML =
-            '<div class="history-header">' +
-                '<div class="history-meta">' +
-                    '<div class="history-players">' + game.players.join(', ') + '</div>' +
-                    '<div class="history-info">' +
-                        formatDate(game.finishedAt) + ' · ' +
-                        formatMode(game.mode) + ' · до ' + game.target +
-                    '</div>' +
-                    '<div class="history-winner">🏆 ' + winnerText + '</div>' +
-                    '<div class="history-scores">' + standingsText + '</div>' +
-                '</div>' +
-                '<div class="history-actions">' +
-                    '<button id="expand-btn-' + idx + '" class="expand-btn" onclick="toggleDetails(' + idx + ')">Детали ▾</button>' +
-                    '<button class="delete-btn" onclick="deleteGame(' + idx + ')">Удалить</button>' +
-                '</div>' +
-            '</div>' +
-            '<div id="table-' + idx + '" class="history-details" style="display:none;">' +
-                buildHistoryTable(game) +
-            '</div>';
-
-        container.appendChild(card);
-    });
+async function renderHistory() {
+    const container = document.getElementById('historyList'); container.replaceChildren();
+    try {
+        const history = await historyStore.readHistory();
+        if (!history.entries.length) container.append(historyElement('p', 'Завершённых игр ещё нет.'));
+        history.entries.forEach((game, index) => {
+            if (!game || !Array.isArray(game.players)) {
+                container.append(historyElement('p', 'Запись ' + (index + 1) + ' имеет неизвестный формат. Она сохранена без изменений.', 'error-message')); return;
+            }
+            const card = historyElement('section', null, 'history-card');
+            const header = historyElement('div', null, 'history-header');
+            const meta = historyElement('div', null, 'history-meta');
+            meta.append(historyElement('div', game.players.map(p => typeof p === 'string' ? p : p?.name || '—').join(', '), 'history-players'));
+            meta.append(historyElement('div', formatDate(game.finishedAt) + ' · ' +
+                (game.mode === 'pairs' ? 'Пара на пару' : 'Каждый сам за себя') + ' · до ' + game.target, 'history-info'));
+            const winnerText = game.winner ? '🏆 ' + game.winner.name + ' — ' + game.winner.score + ' очков'
+                : game.status === 'empty' ? 'Закрыта без раздач' : 'Закрыта досрочно · без победителя';
+            meta.append(historyElement('div', winnerText, 'history-winner'));
+            meta.append(historyElement('div', (Array.isArray(game.standings) ? game.standings : [])
+                .filter(Boolean).map(s => s.name + ': ' + s.score).join(' / '), 'history-scores'));
+            if (game.pendingNote) meta.append(historyElement('p', game.pendingNote, 'hint'));
+            const actions = historyElement('div', null, 'history-actions');
+            const rematch = historyElement('button','Реванш','secondary');
+            rematch.onclick = async () => {
+                rematch.disabled = true;
+                try {
+                    const {library} = await historyStore.readLibrary();
+                    const next = ClaborPlayers.rematch(game,library.profiles);
+                    const previous = await historyStore.readCurrent();
+                    if (previous.game && !await askConfirmation('Начать реванш вместо текущей незаконченной игры?')) return;
+                    await historyStore.save(next,previous.token); location.href = 'game_page.html';
+                } catch (error) { document.getElementById('historyError').textContent = error.message; }
+                finally { rematch.disabled = false; }
+            };
+            const details = buildHistoryTable(game); details.hidden = true; details.id = 'history-details-' + index;
+            const expand = historyElement('button', 'Детали ▾', 'expand-btn');
+            expand.setAttribute('aria-controls', details.id); expand.setAttribute('aria-expanded', 'false');
+            expand.onclick = () => {
+                details.hidden = !details.hidden; expand.textContent = details.hidden ? 'Детали ▾' : 'Детали ▴';
+                expand.setAttribute('aria-expanded', String(!details.hidden));
+            };
+            const remove = historyElement('button', 'Удалить', 'delete-btn');
+            remove.onclick = async () => {
+                if (!await askConfirmation('Удалить эту игру из истории?')) return;
+                try { await historyStore.deleteHistory(index, history.token); await renderHistory(); }
+                catch (error) { document.getElementById('historyError').textContent = error.message; }
+            };
+            if (!game.roster) meta.append(historyElement('p','Старая игра без профилей: сохранена в истории, но не входит в личную статистику.','hint'));
+            actions.append(rematch, expand, remove); header.append(meta, actions); card.append(header, details); container.append(card);
+        });
+        document.getElementById('historyError').textContent = '';
+    } catch (error) { document.getElementById('historyError').textContent = error.message; }
 }
-
-renderHistory();
+async function loadHistory() {
+    try { historyStore = await ClaborDatabase.open(); await renderHistory(); }
+    catch (error) { document.getElementById('historyError').textContent = 'Сохранения недоступны: ' + error.message; }
+}
+window.addEventListener('clabor-storage', ({detail:event}) => { if (event.key === 'gameHistory' || event.key === null) renderHistory(); });
+loadHistory();

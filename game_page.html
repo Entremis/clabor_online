@@ -3,52 +3,59 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f6f8fc"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Игра Клабор</title>
 <link rel="stylesheet" href="styles.css">
+<script src="app_shell.js"></script>
 </head>
 <body>
 <h2>Игра <span class="target-label">до <span id="targetScore"></span> очков</span></h2>
-<div class="tabs">
-    <button class="tab-button" onclick="openTab('game')">Игра</button>
-    <button class="tab-button" onclick="openTab('scores')">Детальный счет</button>
+<p><a href="index.html">← К настройке игры</a></p>
+<p id="gameError" class="error-message" role="alert"></p>
+<button id="reloadGame" hidden onclick="window.location.reload()">Загрузить актуальную игру</button>
+<p id="saveStatus" class="hint" role="status">Сохранено на этом устройстве</p>
+<div class="tabs" role="tablist" aria-label="Разделы игры">
+    <button id="tab-game" role="tab" aria-controls="game" aria-selected="true" class="tab-button" onclick="openTab('game')">Игра</button>
+    <button id="tab-scores" role="tab" aria-controls="scores" aria-selected="false" class="tab-button" onclick="openTab('scores')">Детальный счет</button>
 </div>
 
-<div id="game" class="tab-content">
-    <div id="winnerBanner" class="winner-banner" style="display:none;"></div>
+<div id="game" class="tab-content" role="tabpanel" aria-labelledby="tab-game">
+    <div id="winnerBanner" class="winner-banner" hidden></div>
+    <p id="pendingNotice" class="pending-notice" role="status" hidden></p>
 
     <!-- Банк раздачи: показывается только в режиме «пара на пару» -->
-    <div id="bankControls" class="calc" style="display:none;">
+    <div id="bankControls" class="calc" hidden>
         <div class="calc-body">
             <div class="calc-decls">
                 <div class="decl">
                     <span>Терц (+20)</span>
-                    <button type="button" onclick="changeDecl('terz',-1)">−</button>
+                    <button type="button" aria-label="Убрать терц" onclick="changeDecl('terz',-1)">−</button>
                     <span id="terzCount" class="decl-count">0</span>
-                    <button type="button" onclick="changeDecl('terz',1)">+</button>
+                    <button type="button" aria-label="Добавить терц" onclick="changeDecl('terz',1)">+</button>
                 </div>
                 <div class="decl">
                     <span>Полтинна (+50)</span>
-                    <button type="button" onclick="changeDecl('fifty',-1)">−</button>
+                    <button type="button" aria-label="Убрать полтинну" onclick="changeDecl('fifty',-1)">−</button>
                     <span id="fiftyCount" class="decl-count">0</span>
-                    <button type="button" onclick="changeDecl('fifty',1)">+</button>
+                    <button type="button" aria-label="Добавить полтинну" onclick="changeDecl('fifty',1)">+</button>
                 </div>
                 <div class="decl">
                     <label><input type="checkbox" id="bella" onchange="onDeclChange()"> Белла (+20)</label>
                 </div>
             </div>
             <div class="calc-total">Банк раздачи: <strong id="bankTotal">162</strong></div>
-            <p class="hint">Введи очки одной пары — у второй посчитается само. Можно поправить вручную.</p>
+            <p class="hint">Введите очки одной пары — у второй посчитается автоматически. Штраф «Нет взяток (−100)» не входит в банк: второй паре достаётся весь банк.</p>
         </div>
     </div>
 
-    <h3>Раздает: <span id="dealerName"></span></h3>
-    <form id="gameForm">
+    <h3>Раздача <span id="roundNumber"></span>. Раздает: <span id="dealerName"></span></h3>
+    <form id="gameForm" novalidate>
         <!-- Динамически добавляемые элементы управления для каждого игрока/пары -->
     </form>
 
     <div class="primary-actions">
-        <button onclick="recordScores()">Записать очки</button>
-        <button onclick="deferGame()" class="defer-btn">Отложить</button>
+        <button id="recordButton" data-mutation onclick="recordScores()">Записать очки</button>
+        <button data-mutation onclick="deferGame()" class="defer-btn">Отложить</button>
     </div>
 
     <div id="results">
@@ -57,17 +64,25 @@
 
     <!-- Опасная зона: визуально отделена от основных действий -->
     <div class="danger-zone">
-        <button onclick="resetGame()" class="reset-btn">Сбросить</button>
-        <button onclick="finishGame()" class="close-game-btn">Закрыть игру</button>
+        <button data-mutation onclick="resetGame()" class="reset-btn">Сбросить</button>
+        <button data-mutation onclick="finishGame()" class="close-game-btn">Закрыть игру</button>
     </div>
 </div>
 
-<div id="scores" class="tab-content" style="display:none;">
+<div id="scores" class="tab-content" role="tabpanel" aria-labelledby="tab-scores" hidden>
     <h3>Детальный счет</h3>
+    <section id="roundEditor" class="round-editor" hidden>
+        <h3 id="editorHeading"></h3>
+        <form id="editorForm" novalidate></form>
+        <button data-mutation onclick="saveEditedRound()">Сохранить раздачу</button>
+        <button data-mutation onclick="cancelEdit()">Отменить исправление</button>
+        <p class="hint">Изменение пересчитает все следующие раздачи, висяки, бейты и переходящие очки.</p>
+    </section>
+    <div class="table-scroll" role="region" aria-label="Счёт по раздачам — таблица с горизонтальной прокруткой" tabindex="0">
     <table id="scoreTable">
         <thead>
             <tr>
-                <th>Партия</th>
+                <th>Раздача</th>
                 <th>Игрок</th>
                 <th>Набранные очки</th>
                 <th>Итоговые очки</th>
@@ -80,9 +95,16 @@
             <!-- Динамически добавляемые строки таблицы -->
         </tbody>
     </table>
-    <button onclick="recalculateAllScores()">Пересчитать игру</button>
+    </div>
+    <button data-mutation onclick="recalculateAllScores()">Пересчитать игру</button>
 </div>
 
+<script src="confirmation.js"></script>
+<script src="vendor/dexie.min.js"></script>
+<script src="game_engine.js"></script>
+<script src="game_store.js"></script>
+<script src="database.js"></script>
+<script src="player_library.js"></script>
 <script src="game_logic.js"></script>
 </body>
 </html>
