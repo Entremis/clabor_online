@@ -65,7 +65,7 @@ function scoreInput(labelText, id, value, oninput, allowPenalty = true) {
     const group = element('div', null, 'score-field');
     const label = element('label', labelText); label.htmlFor = id;
     const input = element('input');
-    input.type = 'text'; input.inputMode = allowPenalty ? 'text' : 'numeric';
+    input.type = 'text'; input.inputMode = 'numeric';
     input.pattern = allowPenalty ? '[-−]?[0-9]*' : '[0-9]*'; input.id = id;
     input.placeholder = 'Очки'; input.value = value; input.autocomplete = 'off';
     input.oninput = () => oninput(input.value);

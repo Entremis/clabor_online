@@ -10,6 +10,7 @@
     }
     apply(); media.addEventListener('change', apply);
     document.addEventListener('DOMContentLoaded', () => {
+        const home = location.pathname.endsWith('/') || location.pathname.endsWith('/index.html');
         const header = document.createElement('header'); header.className = 'app-header';
         const brand = document.createElement('a'); brand.href = 'index.html'; brand.className = 'brand'; brand.textContent = '♣ Клабор';
         const label = document.createElement('label'); label.className = 'theme-control'; label.textContent = 'Тема ';
@@ -27,14 +28,20 @@
             nav.append(link);
         });
         const offline = document.createElement('p'); offline.id = 'offlineStatus'; offline.className = 'hint'; offline.setAttribute('role','status');
-        document.body.prepend(header,nav,offline);
+        const statuses = document.createElement('div'); statuses.id = 'appStatus'; statuses.append(offline);
+        if (home) document.body.prepend(header,nav,statuses);
+        else if (document.querySelector('.game-heading')) document.querySelector('.game-heading').after(statuses);
+        else {
+            const back = document.createElement('a'); back.href = 'index.html'; back.className = 'menu-back'; back.textContent = '← В главное меню';
+            document.body.prepend(back,statuses);
+        }
         function networkStatus() { offline.textContent = navigator.onLine ? '' : 'Без интернета · игры сохраняются на этом устройстве'; }
         window.addEventListener('online',networkStatus); window.addEventListener('offline',networkStatus); networkStatus();
         const local = ['localhost','127.0.0.1','[::1]'].includes(location.hostname);
         if ('serviceWorker' in navigator && (!local || new URLSearchParams(location.search).has('offline'))) {
             navigator.serviceWorker.register('sw.js').then(async registration => {
                 await navigator.serviceWorker.ready;
-                if (navigator.onLine) offline.textContent = 'Готово к игре без интернета';
+                if (navigator.onLine && home) offline.textContent = 'Готово к игре без интернета';
                 function offerUpdate() {
                     if (!registration.waiting || !navigator.serviceWorker.controller || document.getElementById('appUpdate')) return;
                     const button = document.createElement('button'); button.id = 'appUpdate'; button.className = 'secondary'; button.textContent = 'Доступна новая версия · обновить';
