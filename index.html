@@ -1,44 +1,26 @@
 <!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Настройка игры Клабор</title>
-<link rel="stylesheet" href="styles.css">
-</head>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f6f8fc"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Новая игра — Клабор</title><link rel="stylesheet" href="styles.css"><script src="app_shell.js"></script></head>
 <body>
-<h2>Настройка игры</h2>
-
-<div id="resumeBlock" class="resume-block" style="display:none;">
-    <strong>Незаконченная игра:</strong> <span id="resumePlayers"></span>
-    <button type="button" onclick="window.location.href='game_page.html'">Продолжить</button>
-</div>
-
-<form id="gameSetup">
-    <p>Размер игры:</p>
-    <input type="radio" id="score501" name="gameSize" value="501" checked>
-    <label for="score501">501</label>
-    <input type="radio" id="score1001" name="gameSize" value="1001">
-    <label for="score1001">1001</label>
-
-    <p>Режим игры:</p>
-    <input type="radio" id="modeIndividual" name="gameMode" value="individual" checked>
-    <label for="modeIndividual">Каждый сам за себя (2–3 игрока)</label>
-    <br>
-    <input type="radio" id="modePairs" name="gameMode" value="pairs">
-    <label for="modePairs">Пара на пару (2×2)</label>
-
-    <h3 id="playersHeading">Введите имена игроков:</h3>
-    <p class="hint" id="playersHint"></p>
-    <div id="playerNames"><!-- заполняется из setup.js по режиму --></div>
-    <button type="button" id="addPlayerBtn" onclick="addPlayer()">+</button>
-    <button type="submit">Начать игру</button>
-</form>
-
-<p style="margin-top:20px;">
-    <button type="button" onclick="window.location.href='history.html'" class="history-link-btn">История игр</button>
-</p>
-
-<script src="setup.js"></script>
-</body>
-</html>
+<h1>Новая игра</h1><p id="setupError" class="error-message" role="alert"></p>
+<div id="resumeBlock" class="resume-block" hidden><strong>Незаконченная игра:</strong> <span id="resumePlayers"></span><a href="game_page.html">Продолжить</a></div>
+<section class="panel">
+<label for="savedLineup">Сохранённый состав</label><select id="savedLineup"><option value="">Выбрать состав…</option></select>
+<form id="quickProfile"><label for="quickProfileName">Добавить нового игрока</label><input id="quickProfileName" type="text" maxlength="100" required placeholder="Имя"><button id="addProfileButton" type="submit" disabled>Добавить в профили</button></form>
+<p class="hint">Имя вводится один раз. Потом выбирайте профиль для личных и парных игр. <a href="players.html">Управлять игроками</a></p>
+</section>
+<form id="gameSetup"><fieldset id="setupFields" disabled>
+<legend>Настройка игры</legend>
+<p>Размер игры:</p><input type="radio" id="score501" name="gameSize" value="501" checked><label for="score501">501</label>
+<input type="radio" id="score1001" name="gameSize" value="1001"><label for="score1001">1001</label>
+<p>Режим:</p><input type="radio" id="modeIndividual" name="gameMode" value="individual" checked><label for="modeIndividual">Каждый сам за себя (2–3 игрока)</label><br>
+<input type="radio" id="modePairs" name="gameMode" value="pairs"><label for="modePairs">Пара на пару (2×2)</label>
+<h2>Кто играет</h2><p id="playersHint" class="hint"></p>
+<div id="playerNames"></div><button type="button" id="addPlayerBtn" onclick="addPlayer()">Добавить третьего игрока</button>
+<div class="lineup-save"><label for="lineupName">Название состава</label><input type="text" id="lineupName" maxlength="100" placeholder="Например «Пятничная игра»"><button id="saveLineupButton" type="button">Сохранить состав</button></div>
+<button id="startGameButton" type="submit">Начать игру</button>
+</fieldset></form>
+<p id="setupStatus" class="hint" role="status"></p>
+<script src="confirmation.js"></script><script src="vendor/dexie.min.js"></script><script src="game_engine.js"></script><script src="game_store.js"></script><script src="database.js"></script><script src="player_library.js"></script><script src="setup.js"></script>
+</body></html>

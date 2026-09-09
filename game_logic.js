@@ -1,526 +1,385 @@
-/* ── Persistence helpers ────────────────────────────────────────────────── */
-
-function loadCurrentGame() {
-    var raw = localStorage.getItem('currentGame');
-    if (!raw) { return null; }
-    try { return JSON.parse(raw); } catch (e) { return null; }
+'use strict';
+let currentGame;
+let currentToken;
+let gameStore;
+let blocked = false;
+let unsaved = false;
+const $ = id => document.getElementById(id);
+function element(tag, text, className) {
+    const node = document.createElement(tag);
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    if (className) node.className = className;
+    return node;
 }
-
-function saveGame() {
-    var game = loadCurrentGame();
-    if (!game) { return; }
-
-    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
-    var rounds = {};
-
-    for (var i = 0; i < scoreTable.rows.length; i++) {
-        var row = scoreTable.rows[i];
-        var roundNum = parseInt(row.cells[0].innerText, 10);
-        if (!rounds[roundNum]) { rounds[roundNum] = []; }
-        rounds[roundNum].push({
-            name: row.cells[1].innerText,
-            score: parseInt(row.cells[2].querySelector('input').value, 10) || 0,
-            played: row.cells[5].querySelector('select').value
-        });
+function playerLabel(player, index) {
+    return player.name + (currentGame.players.filter(p => p.name === player.name).length > 1 ? ' (' + (index + 1) + ')' : '');
+}
+function reportError(error) {
+    $('gameError').textContent = error.message || String(error);
+    if (error.code === 'CONFLICT') {
+        blocked = true;
+        document.querySelectorAll('#gameForm input, #gameForm button, #editorForm input, #editorForm button, #editorForm select, #bankControls button, #bankControls input, [data-mutation]')
+            .forEach(control => { control.disabled = true; });
+        $('reloadGame').hidden = false;
     }
-
-    var roundNums = Object.keys(rounds).map(Number).sort(function(a, b) { return a - b; });
-    game.rounds = roundNums.map(function(n) { return rounds[n]; });
-    game.currentDealer = parseInt(localStorage.getItem('currentDealer'), 10) || 0;
-    localStorage.setItem('currentGame', JSON.stringify(game));
+    $('saveStatus').textContent = 'Изменения не сохранены';
 }
-
-// Insert a saved round's rows into the score table without advancing the dealer.
-function replayRound(entries, roundNumber) {
-    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
-    entries.forEach(function(player) {
-        var newRow = scoreTable.insertRow();
-
-        var c = newRow.insertCell();
-        c.innerText = roundNumber;
-
-        c = newRow.insertCell();
-        c.innerText = player.name;
-
-        c = newRow.insertCell();
-        c.innerHTML = '<input type="number" value="' + player.score + '" class="editable"' +
-                      ' data-player="' + player.name + '" data-round="' + roundNumber + '"' +
-                      ' onchange="handleInputChange(this)">';
-
-        c = newRow.insertCell(); // Итоговые очки — пересчитается ниже
-        c.innerText = '';
-
-        c = newRow.insertCell();
-        c.className = 'beit';
-        c.innerText = '-'; // пересчитается в recalculateBeitFromRound
-
-        c = newRow.insertCell();
-        c.innerHTML = '<select class="editable" data-player="' + player.name + '" data-round="' + roundNumber + '">' +
-            '<option value="Да"' + (player.played === 'Да' ? ' selected' : '') + '>Да</option>' +
-            '<option value="Нет"' + (player.played === 'Нет' ? ' selected' : '') + '>Нет</option>' +
-            '</select>';
-
-        c = newRow.insertCell();
-        c.innerHTML = '<button onclick="saveChanges(this)">Сохранить</button>';
-    });
-}
-
-function deferGame() {
-    saveGame();
-    window.location.href = 'index.html';
-}
-
-/* ── History helpers ────────────────────────────────────────────────────── */
-
-// Compute per-player standings from the current DOM table.
-function computeCurrentStandings() {
-    var playerNames = JSON.parse(localStorage.getItem('playerNames'));
-    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
-    return playerNames.map(function(name) {
-        var lastScore = 0;
-        var maxBeit = 0;
-        for (var i = 0; i < scoreTable.rows.length; i++) {
-            var row = scoreTable.rows[i];
-            if (row.cells[1].innerText === name) {
-                lastScore = parseInt(row.cells[3].innerText, 10) || 0;
-                var beit = row.cells[4].innerText === '-' ? 0 : parseInt(row.cells[4].innerText, 10);
-                if (beit > maxBeit) { maxBeit = beit; }
+let saveQueue = Promise.resolve();
+let saveVersion = 0;
+function persist(next) {
+    unsaved = true;
+    const snapshot = Clabor.clone(next), version = ++saveVersion;
+    const operation = saveQueue.then(async () => {
+        if (blocked) return false;
+        try {
+            const saved = await gameStore.save(snapshot, currentToken);
+            currentToken = saved.token;
+            if (version === saveVersion) {
+                currentGame = saved.game; unsaved = false;
+                $('gameError').textContent = ''; $('saveStatus').textContent = 'Сохранено на этом устройстве';
             }
-        }
-        return { name: name, score: lastScore, beit: maxBeit };
+            return true;
+        } catch (error) { reportError(error); return false; }
     });
+    saveQueue = operation;
+    return operation;
 }
-
-// Snapshot rounds from the DOM including computed finalScore and beit for the history record.
-function buildRoundsSnapshot() {
-    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
-    var rounds = {};
-    for (var i = 0; i < scoreTable.rows.length; i++) {
-        var row = scoreTable.rows[i];
-        var roundNum = parseInt(row.cells[0].innerText, 10);
-        if (!rounds[roundNum]) { rounds[roundNum] = []; }
-        rounds[roundNum].push({
-            name: row.cells[1].innerText,
-            score: parseInt(row.cells[2].querySelector('input').value, 10) || 0,
-            finalScore: parseInt(row.cells[3].innerText, 10) || 0,
-            beit: row.cells[4].innerText,
-            played: row.cells[5].querySelector('select').value
-        });
+function saveDraft() {
+    if (!currentGame || blocked) return;
+    unsaved = true;
+    persist(currentGame);
+}
+function pendingDescription(result) {
+    const parts = [];
+    if (result.hanging) {
+        const name = playerLabel(currentGame.players[result.hanging.caller], result.hanging.caller);
+        parts.push('Висяк: ' + name + ' раздаёт и автоматически играет в масть, выпавшую при раздаче. Очки будут начислены после разрешения висяка.');
     }
-    var roundNums = Object.keys(rounds).map(Number).sort(function(a, b) { return a - b; });
-    return roundNums.map(function(n) { return rounds[n]; });
+    result.pots.forEach(pot => parts.push(pot.amount + ' очков бейта из раздачи ' + pot.sourceRound +
+        ' получит тот из игроков ' + pot.candidates.map(i => playerLabel(currentGame.players[i], i)).join(', ') +
+        ', кто наберёт больше очков в следующей раздаче. При равенстве перенос продолжается.'));
+    if (result.extraRound) parts.push('Равный общий счёт на финише. Сыграйте ещё одну раздачу: победит игрок с большим общим счётом.');
+    return parts.join(' ');
 }
-
-function finishGame() {
-    if (!confirm('Закрыть игру и сохранить в историю?')) { return; }
-
-    var game = loadCurrentGame();
-    if (!game) { return; }
-
-    var standings = computeCurrentStandings();
-    var sorted = standings.slice().sort(function(a, b) { return b.score - a.score; });
-    var winner = sorted.length > 0 ? { name: sorted[0].name, score: sorted[0].score } : null;
-
-    var historyEntry = {
-        id: game.id,
-        startedAt: game.startedAt,
-        finishedAt: new Date().toISOString(),
-        mode: game.mode,
-        target: game.target,
-        players: game.players,
-        rounds: buildRoundsSnapshot(),
-        winner: winner,
-        standings: standings,
-        finished: true
-    };
-
-    var rawHistory = localStorage.getItem('gameHistory');
-    var history;
-    try { history = rawHistory ? JSON.parse(rawHistory) : []; } catch (e) { history = []; }
-    history.unshift(historyEntry);
-    localStorage.setItem('gameHistory', JSON.stringify(history));
-
-    localStorage.removeItem('currentGame');
-    window.location.href = 'index.html';
-}
-
-function resetGame() {
-    if (!confirm('Сбросить игру? Она будет удалена без сохранения.')) { return; }
-
-    // Remove all keys the start screen uses to detect an active game.
-    localStorage.removeItem('currentGame');
-    localStorage.removeItem('playerNames');
-    localStorage.removeItem('gameMode');
-    localStorage.removeItem('gameSize');
-    localStorage.removeItem('currentDealer');
-
-    window.location.href = 'index.html';
-}
-
-/* ── Initialisation ─────────────────────────────────────────────────────── */
-
-window.onload = function() {
-    var game = loadCurrentGame();
-    var playerNames = game ? game.players : JSON.parse(localStorage.getItem('playerNames'));
-    var mode = game ? game.mode : (localStorage.getItem('gameMode') || 'individual');
-
-    // Keep legacy keys in sync so existing helper functions keep working.
-    if (game) {
-        localStorage.setItem('playerNames', JSON.stringify(game.players));
-        localStorage.setItem('gameMode', game.mode);
-        localStorage.setItem('gameSize', String(game.target));
+function scoreInput(labelText, id, value, oninput, allowPenalty = true) {
+    const group = element('div', null, 'score-field');
+    const label = element('label', labelText); label.htmlFor = id;
+    const input = element('input');
+    input.type = 'text'; input.inputMode = allowPenalty ? 'text' : 'numeric';
+    input.pattern = allowPenalty ? '[-−]?[0-9]*' : '[0-9]*'; input.id = id;
+    input.placeholder = 'Очки'; input.value = value; input.autocomplete = 'off';
+    input.oninput = () => oninput(input.value);
+    group.append(label, input);
+    if (allowPenalty) {
+        const noTricks = element('button', 'Нет взяток (−100)', 'no-tricks-button');
+        noTricks.type = 'button'; noTricks.dataset.mutation = '';
+        noTricks.setAttribute('aria-label', labelText + ': нет взяток, минус 100');
+        noTricks.onclick = () => { input.value = '-100'; oninput(input.value); };
+        group.append(noTricks);
     }
-
-    var gameForm = document.getElementById('gameForm');
-    playerNames.forEach(function(name, index) {
-        var div = document.createElement('div');
-        var scoreAttrs = 'type="number" inputmode="numeric" name="score' + index + '" placeholder="Очки"';
-        if (mode === 'pairs') {
-            scoreAttrs += ' oninput="onPairScoreInput(\'score' + index + '\')"';
-        }
-        div.innerHTML = '<label>' + name + '</label>' +
-                        '<input type="radio" name="played" value="' + index + '"> Выбирал масть' +
-                        '<input ' + scoreAttrs + '>';
-        gameForm.appendChild(div);
+    return group;
+}
+function renderForm(result) {
+    const form = $('gameForm'); form.replaceChildren();
+    const draft = currentGame.draft;
+    const callerId = result.forcedCallerId || draft.callerId;
+    currentGame.players.forEach((player, i) => {
+        const group = element('div', null, 'game-player');
+        group.append(scoreInput('Очки — ' + playerLabel(player, i), 'score-' + i, draft.scores[i], value => {
+            currentGame.draft.scores[i] = value; currentGame.draft.lastEdited = i;
+            if (currentGame.mode === 'pairs') recomputePair();
+            saveDraft();
+        }));
+        const choice = element('label', null, 'caller-label');
+        const radio = element('input'); radio.type = 'radio'; radio.name = 'played'; radio.value = player.id;
+        radio.checked = callerId === player.id; radio.disabled = Boolean(result.forcedCallerId) || Boolean(result.winner);
+        radio.onchange = () => { currentGame.draft.callerId = player.id; saveDraft(); };
+        choice.append(radio, document.createTextNode('Выбирал масть — ' + playerLabel(player, i)));
+        group.append(choice); form.append(group);
     });
-
-    document.getElementById('targetScore').innerText = String(getTarget());
-
-    if (mode === 'pairs') {
-        document.getElementById('bankControls').style.display = 'block';
-        updateBankDisplay();
-    }
-
-    // Restore saved rounds (if any) before showing the dealer for the next round.
-    if (game && game.rounds.length > 0) {
-        localStorage.setItem('currentDealer', String(game.currentDealer));
-        game.rounds.forEach(function(entries, i) {
-            replayRound(entries, i + 1);
-        });
-        recalculateBeitFromRound(1);
-        recalculateAllScores();
-    }
-
-    updateDealer();
-    updateResults();
-};
-
-/* ── Core game helpers ──────────────────────────────────────────────────── */
-
-// Режим игры: 'individual' или 'pairs' (по умолчанию individual).
-function getMode() {
-    return localStorage.getItem('gameMode') || 'individual';
-}
-
-// Целевой счёт игры (501 / 1001, по умолчанию 501)
-function getTarget() {
-    return parseInt(localStorage.getItem('gameSize'), 10) || 501;
-}
-
-function recordScores() {
-    var playerNames = JSON.parse(localStorage.getItem('playerNames'));
-    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
-    var currentRound = Math.floor(scoreTable.rows.length / playerNames.length) + 1;
-    var scores = [];
-
-    playerNames.forEach(function(name, index) {
-        var score = parseInt(document.querySelector('input[name="score' + index + '"]').value, 10) || 0;
-        var played = document.querySelector('input[name="played"]:checked') ? (document.querySelector('input[name="played"]:checked').value == index ? 'Да' : 'Нет') : 'Нет';
-        scores.push({ name: name, score: score, played: played });
-    });
-
-    scores.forEach(function(player, index) {
-        var newRow = scoreTable.insertRow();
-
-        var newCell = newRow.insertCell();
-        newCell.innerText = currentRound;
-
-        newCell = newRow.insertCell();
-        newCell.innerText = player.name;
-
-        newCell = newRow.insertCell();
-        newCell.innerHTML = `<input type="number" value="${player.score}" class="editable" data-player="${player.name}" data-round="${currentRound}" onchange="handleInputChange(this)">`;
-
-        newCell = newRow.insertCell(); // Итоговые очки
-        newCell.innerText = '';
-
-        newCell = newRow.insertCell();
-        newCell.className = "beit";
-        newCell.innerText = calculateBeit(scoreTable, player, scores, currentRound);
-
-        newCell = newRow.insertCell();
-        newCell.innerHTML = `<select class="editable" data-player="${player.name}" data-round="${currentRound}">
-                                <option value="Да" ${player.played === 'Да' ? 'selected' : ''}>Да</option>
-                                <option value="Нет" ${player.played === 'Нет' ? 'selected' : ''}>Нет</option>
-                             </select>`;
-
-        newCell = newRow.insertCell();
-        newCell.innerHTML = `<button onclick="saveChanges(this)">Сохранить</button>`;
-    });
-
-    // Save before updateDealer so currentDealer captured is the dealer for this next round.
-    saveGame();
-    updateDealer();
-    recalculateAllScores();
-    updateResults();
-    resetForm();
-}
-
-function resetForm() {
-    var gameForm = document.getElementById('gameForm');
-    gameForm.reset();
-}
-
-function calculateFinalScore(scoreTable, player, scores, currentRound) {
-    var previousRoundScores = getPreviousRoundScores(scoreTable, player.name, currentRound);
-    var previousScore = previousRoundScores.previousScore || 0;
-    var currentScore = player.score;
-    var beit = player.beit;
-
-    if (beit > 0) {
-        if (beit < 3) {
-            return previousScore;
-        } else {
-            return previousScore - 100;
-        }
-    } else {
-        var highestScore = Math.max(...scores.map(s => s.score));
-        if (player.played === 'Нет') {
-            if (player.score === highestScore) {
-                var scoreWithBeit = scores.find(s => s.beit > 0)?.score || 0;
-                return previousScore + currentScore + scoreWithBeit;
-            } else {
-                return previousScore + currentScore;
-            }
-        } else {
-            return previousScore + currentScore;
-        }
-    }
-}
-
-function getPreviousRoundScores(scoreTable, playerName, currentRound) {
-    for (var i = scoreTable.rows.length - 1; i >= 0; i--) {
-        var row = scoreTable.rows[i];
-        if (row.cells[1].innerText === playerName && parseInt(row.cells[0].innerText, 10) < currentRound) {
-            return {
-                previousScore: parseInt(row.cells[3].innerText, 10) || 0,
-                previousBeit: row.cells[4].innerText
-            };
-        }
-    }
-    return {};
-}
-
-function saveChanges(button) {
-    var row = button.parentElement.parentElement;
-    var round = parseInt(row.cells[0].innerText, 10);
-    var playerName = row.cells[1].innerText;
-    var newScore = parseInt(row.cells[2].querySelector('input').value, 10);
-    var newPlayed = row.cells[5].querySelector('select').value;
-
-    updateRow(round, playerName, newScore, newPlayed);
-    recalculateBeitFromRound(round);
-    recalculateAllScores();
-    updateResults();
-    saveGame();
-}
-
-function handleInputChange(input) {
-    var row = input.parentElement.parentElement;
-    var round = parseInt(row.cells[0].innerText, 10);
-    recalculateBeitFromRound(round);
-    recalculateAllScores();
-    updateResults();
-    saveGame();
-}
-
-function updateRow(round, playerName, newScore, newPlayed) {
-    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
-    for (var i = 0; i < scoreTable.rows.length; i++) {
-        var row = scoreTable.rows[i];
-        if (parseInt(row.cells[0].innerText, 10) === round && row.cells[1].innerText === playerName) {
-            row.cells[2].querySelector('input').value = newScore;
-            row.cells[5].querySelector('select').value = newPlayed;
-            break;
-        }
-    }
-}
-
-function recalculateBeitFromRound(fromRound) {
-    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
-    var playerNames = JSON.parse(localStorage.getItem('playerNames'));
-
-    for (var i = fromRound - 1; i < scoreTable.rows.length; i++) {
-        var row = scoreTable.rows[i];
-        var round = parseInt(row.cells[0].innerText, 10);
-        var playerName = row.cells[1].innerText;
-        var score = parseInt(row.cells[2].querySelector('input').value, 10);
-        var played = row.cells[5].querySelector('select').value;
-
-        var scores = playerNames.map(name => {
-            var playerRow = Array.from(scoreTable.rows).find(r => r.cells[0].innerText == round && r.cells[1].innerText == name);
-            var playerScore = parseInt(playerRow.cells[2].querySelector('input').value, 10);
-            return { name: name, score: playerScore, beit: playerRow.cells[4].innerText === '-' ? 0 : parseInt(playerRow.cells[4].innerText, 10) };
-        });
-
-        row.cells[4].innerText = calculateBeit(scoreTable, { name: playerName, score: score, played: played }, scores, round);
-    }
-}
-
-function recalculateAllScores() {
-    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
-    var playerNames = JSON.parse(localStorage.getItem('playerNames'));
-
-    for (var i = 0; i < scoreTable.rows.length; i++) {
-        var row = scoreTable.rows[i];
-        var round = parseInt(row.cells[0].innerText, 10);
-        var playerName = row.cells[1].innerText;
-        var score = parseInt(row.cells[2].querySelector('input').value, 10);
-        var played = row.cells[5].querySelector('select').value;
-        var beit = row.cells[4].innerText === '-' ? 0 : parseInt(row.cells[4].innerText, 10);
-
-        var scores = playerNames.map(name => {
-            var playerRow = Array.from(scoreTable.rows).find(r => r.cells[0].innerText == round && r.cells[1].innerText == name);
-            var playerScore = parseInt(playerRow.cells[2].querySelector('input').value, 10);
-            return { name: name, score: playerScore, beit: playerRow.cells[4].innerText === '-' ? 0 : parseInt(playerRow.cells[4].innerText, 10) };
-        });
-
-        row.cells[3].innerText = calculateFinalScore(scoreTable, { name: playerName, score: score, played: played, beit: beit }, scores, round);
-    }
-}
-
-function calculateBeit(scoreTable, player, scores, currentRound) {
-    if (player.played === 'Да' && player.score < Math.max(...scores.map(s => s.score))) {
-        var lastBeitValue = 0;
-        for (var i = 0; i < scoreTable.rows.length; i++) {
-            var row = scoreTable.rows[i];
-            if (row.cells[1].innerText === player.name && parseInt(row.cells[0].innerText, 10) < currentRound) {
-                var beitValue = row.cells[4].innerText;
-                if (beitValue !== '-') {
-                    lastBeitValue = parseInt(beitValue, 10);
-                }
-            }
-        }
-        return lastBeitValue + 1;
-    }
-    return '-';
-}
-
-function updateDealer() {
-    var playerNames = JSON.parse(localStorage.getItem('playerNames'));
-    var currentDealer = (parseInt(localStorage.getItem('currentDealer')) || 0) % playerNames.length;
-    document.getElementById('dealerName').innerText = playerNames[currentDealer];
-    localStorage.setItem('currentDealer', currentDealer + 1);
-}
-
-function openTab(tabName) {
-    var i;
-    var x = document.getElementsByClassName("tab-content");
-    for (i = 0; i < x.length; i++) {
-        x[i].style.display = "none";
-    }
-    document.getElementById(tabName).style.display = "block";
-}
-
-function updateResults() {
-    var scoreTable = document.getElementById('scoreTable').getElementsByTagName('tbody')[0];
-    var playerNames = JSON.parse(localStorage.getItem('playerNames'));
-    var resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = '';
-
-    var target = getTarget();
-    var standings = [];
-
-    playerNames.forEach(function(name, index) {
-        var lastScore = 0;
-        var maxBeit = 0;
-
-        for (var i = 0; i < scoreTable.rows.length; i++) {
-            var row = scoreTable.rows[i];
-            if (row.cells[1].innerText === name) {
-                lastScore = parseInt(row.cells[3].innerText, 10) || 0;
-                var beit = row.cells[4].innerText === '-' ? 0 : parseInt(row.cells[4].innerText, 10);
-                if (beit > maxBeit) {
-                    maxBeit = beit;
-                }
-            }
-        }
-
-        standings.push({ name: name, score: lastScore, beit: maxBeit });
-
-        var resultItem = document.createElement('div');
-        resultItem.innerText = name + ' Очки: ' + lastScore + ', Бейт: ' + maxBeit;
-        resultsDiv.appendChild(resultItem);
-    });
-
-    showWinner(standings, target);
-}
-
-// Победитель: первый, кто достиг целевого счёта.
-// При достижении порога показывает кнопку «Завершить и сохранить в историю».
-function showWinner(standings, target) {
-    var banner = document.getElementById('winnerBanner');
-    if (!banner) { return; }
-
-    var reached = standings.filter(function(s) { return s.score >= target; });
-    if (reached.length === 0) {
-        banner.style.display = 'none';
-        banner.innerHTML = '';
-        return;
-    }
-
-    reached.sort(function(a, b) { return b.score - a.score; });
-    var winner = reached[0];
-    banner.style.display = 'block';
-    banner.innerHTML =
-        '<div>🏆 Победитель: ' + winner.name + ' — ' + winner.score + ' очков (игра до ' + target + ')</div>' +
-        '<button onclick="finishGame()" class="finish-btn">Завершить и сохранить в историю</button>';
-}
-
-/* ── Банк раздачи (режим «пара на пару») ────────────────────────────────── */
-
-var calcDecls = { terz: 0, fifty: 0 };
-var lastEditedScore = 'score0';
-
-function getBank() {
-    var bellaEl = document.getElementById('bella');
-    var bella = (bellaEl && bellaEl.checked) ? 20 : 0;
-    return 162 + calcDecls.terz * 20 + calcDecls.fifty * 50 + bella;
-}
-
-function updateBankDisplay() {
-    var bankEl = document.getElementById('bankTotal');
-    if (bankEl) { bankEl.innerText = String(getBank()); }
-}
-
-function changeDecl(type, delta) {
-    calcDecls[type] = Math.max(0, calcDecls[type] + delta);
-    var el = document.getElementById(type === 'terz' ? 'terzCount' : 'fiftyCount');
-    if (el) { el.innerText = String(calcDecls[type]); }
-    onDeclChange();
-}
-
-function onDeclChange() {
+    form.querySelectorAll('input[type="text"]').forEach(input => { input.disabled = Boolean(result.winner); });
+    form.querySelectorAll('.no-tricks-button').forEach(button => { button.disabled = Boolean(result.winner); });
+    $('recordButton').disabled = Boolean(result.winner);
+    $('bankControls').querySelectorAll('button, input').forEach(input => { input.disabled = Boolean(result.winner); });
     updateBankDisplay();
-    recomputeOtherPairScore();
 }
-
-function onPairScoreInput(which) {
-    lastEditedScore = which;
-    recomputeOtherPairScore();
+function recomputePair() {
+    const draft = currentGame.draft;
+    const source = draft.lastEdited;
+    const destination = source === 0 ? 1 : 0;
+    let value = '';
+    try {
+        const score = Clabor.cardPoints(Clabor.parseScore(draft.scores[source]));
+        const bank = Clabor.bank(draft.declarations);
+        if (score <= bank) {
+            const remaining = bank - score;
+            const destinationHasNoTricks = /^[-−]100$/.test(draft.scores[destination].trim());
+            value = remaining === 0 && destinationHasNoTricks ? '-100' : String(remaining);
+        }
+    } catch (_) { /* Preserve invalid source input so validation can explain it. */ }
+    draft.scores[destination] = value;
+    $('score-' + destination).value = value;
 }
-
-function recomputeOtherPairScore() {
-    if (getMode() !== 'pairs') { return; }
-    var s0 = document.querySelector('input[name="score0"]');
-    var s1 = document.querySelector('input[name="score1"]');
-    if (!s0 || !s1) { return; }
-
-    var src = lastEditedScore === 'score0' ? s0 : s1;
-    var dst = lastEditedScore === 'score0' ? s1 : s0;
-    if (src.value === '') { return; }
-
-    var bank = getBank();
-    var v = parseInt(src.value, 10) || 0;
-    dst.value = bank - v;
+function updateBankDisplay() {
+    const d = currentGame.draft.declarations;
+    $('bankControls').hidden = currentGame.mode !== 'pairs';
+    $('terzCount').textContent = d.terz; $('fiftyCount').textContent = d.fifty;
+    $('bella').checked = d.bella; $('bankTotal').textContent = Clabor.bank(d);
 }
+function changeDecl(type, delta) {
+    if (blocked) return;
+    currentGame.draft.declarations[type] = Math.max(0, currentGame.draft.declarations[type] + delta);
+    updateBankDisplay(); recomputePair(); saveDraft();
+}
+function onDeclChange() {
+    currentGame.draft.declarations.bella = $('bella').checked;
+    updateBankDisplay(); recomputePair(); saveDraft();
+}
+function renderResults(result) {
+    $('results').replaceChildren();
+    currentGame.players.forEach((player, i) => {
+        $('results').append(element('div', playerLabel(player, i) + ' — ' + result.totals[i] +
+            ' очков · Бейты: ' + result.beits[i]));
+    });
+    $('dealerName').textContent = playerLabel(currentGame.players[result.dealer], result.dealer);
+    $('roundNumber').textContent = currentGame.rounds.length + 1;
+    const note = pendingDescription(result);
+    $('pendingNotice').textContent = note; $('pendingNotice').hidden = !note;
+    $('winnerBanner').replaceChildren(); $('winnerBanner').hidden = !result.winner;
+    if (result.winner) {
+        const i = currentGame.players.findIndex(player => player.id === result.winner);
+        $('winnerBanner').append(element('div', '🏆 Победитель: ' + playerLabel(currentGame.players[i], i) + ' — ' + result.totals[i] + ' очков'));
+        const finish = element('button', 'Завершить и сохранить в историю', 'finish-btn');
+        finish.dataset.mutation = ''; finish.onclick = () => finishGame(); $('winnerBanner').append(finish);
+        const rematch = element('button', 'Сохранить и сыграть реванш'); rematch.dataset.mutation = '';
+        rematch.onclick = () => finishGame(true); $('winnerBanner').append(rematch);
+    }
+}
+function renderTable(result) {
+    const body = $('scoreTable').tBodies[0]; body.replaceChildren();
+    currentGame.rounds.forEach((round, r) => {
+        const computed = result.rounds[r];
+        currentGame.players.forEach((player, i) => {
+            const row = body.insertRow();
+            [r + 1, playerLabel(player, i), round.scores[i], computed.totals[i],
+                computed.beits[i], computed.callerId === player.id ? 'Да' : 'Нет'].forEach(value => {
+                row.insertCell().textContent = value;
+            });
+            if (i === 0) {
+                const cell = row.insertCell(); cell.rowSpan = currentGame.players.length;
+                const edit = element('button', 'Изменить'); edit.dataset.mutation = '';
+                edit.setAttribute('aria-label', 'Изменить раздачу ' + (r + 1)); edit.onclick = () => startEdit(r);
+                cell.append(edit);
+            }
+        });
+        if (computed.notes.length) {
+            const cell = body.insertRow().insertCell(); cell.colSpan = 7;
+            cell.className = 'round-note'; cell.textContent = computed.notes.join(' ');
+        }
+    });
+}
+function render() {
+    const result = Clabor.calculate(currentGame);
+    $('targetScore').textContent = currentGame.target;
+    renderForm(result); renderResults(result); renderTable(result); renderEditor();
+}
+async function recordScores() {
+    if (blocked) return;
+    await saveQueue;
+    try {
+        if (currentGame.editDraft) throw new Error('Сначала сохраните или отмените исправление прошлой раздачи.');
+        const next = Clabor.appendRound(currentGame);
+        if (await persist(next)) render();
+    } catch (error) { reportError(error); }
+}
+function openTab(name) {
+    ['game', 'scores'].forEach(tabName => {
+        $(tabName).hidden = tabName !== name;
+        $('tab-' + tabName).setAttribute('aria-selected', String(tabName === name));
+    });
+}
+async function startEdit(index) {
+    if (blocked) return;
+    if (currentGame.editDraft && currentGame.editDraft.roundId !== currentGame.rounds[index].id) {
+        reportError(new Error('Сначала сохраните или отмените текущее исправление.')); return;
+    }
+    const round = currentGame.rounds[index];
+    const computed = Clabor.calculate(currentGame).rounds[index];
+    const next = Clabor.clone(currentGame);
+    next.editDraft = next.editDraft || { roundId: round.id, scores: round.scores.map(String),
+        callerId: computed.callerId, declarations: Clabor.clone(round.declarations) };
+    if (await persist(next)) renderEditor();
+}
+function renderEditor() {
+    const draft = currentGame.editDraft;
+    $('roundEditor').hidden = !draft;
+    if (!draft) return;
+    const index = currentGame.rounds.findIndex(round => round.id === draft.roundId);
+    const computed = Clabor.calculate(currentGame).rounds[index];
+    $('editorHeading').textContent = 'Исправить раздачу ' + (index + 1);
+    const form = $('editorForm'); form.replaceChildren();
+    currentGame.players.forEach((player, i) => {
+        form.append(scoreInput('Очки — ' + playerLabel(player, i), 'edit-score-' + i, draft.scores[i], value => {
+            currentGame.editDraft.scores[i] = value; saveDraft();
+        }));
+    });
+    const label = element('label', 'Кто выбирал масть'); label.htmlFor = 'editCaller';
+    const select = element('select'); select.id = 'editCaller';
+    const empty = element('option', 'Выберите игрока'); empty.value = ''; select.append(empty);
+    currentGame.players.forEach((player, i) => {
+        const option = element('option', playerLabel(player, i)); option.value = player.id; select.append(option);
+    });
+    select.value = computed.forced ? computed.callerId : draft.callerId || '';
+    select.disabled = computed.forced;
+    select.onchange = () => { currentGame.editDraft.callerId = select.value || null; saveDraft(); };
+    form.append(label, select);
+    if (computed.forced) form.append(element('p', 'После висяка играет тот же игрок. Чтобы изменить это, исправьте исходную раздачу.', 'hint'));
+    if (currentGame.mode === 'pairs') {
+        if (draft.declarations === null) {
+            form.append(element('p', 'В старой раздаче объявления не сохранены. Проверьте сумму очков вручную.', 'hint'));
+        } else {
+            ['terz', 'fifty'].forEach(type => {
+                form.append(scoreInput(type === 'terz' ? 'Количество терцев' : 'Количество полтинн', 'edit-' + type,
+                    String(draft.declarations[type]), value => {
+                        // Keep incomplete declaration edits separately until Save validates them.
+                        currentGame.editDraft[type + 'Text'] = value; saveDraft();
+                    }, false));
+                if (draft[type + 'Text'] !== undefined) $('edit-' + type).value = draft[type + 'Text'];
+            });
+            const bellaLabel = element('label', null, 'caller-label');
+            const bella = element('input'); bella.type = 'checkbox'; bella.checked = draft.declarations.bella;
+            bella.onchange = () => { currentGame.editDraft.declarations.bella = bella.checked; saveDraft(); };
+            bellaLabel.append(bella, document.createTextNode('Белла (+20)')); form.append(bellaLabel);
+        }
+    }
+}
+async function saveEditedRound() {
+    if (!currentGame.editDraft || blocked) return;
+    try {
+        const next = Clabor.clone(currentGame), draft = next.editDraft;
+        const index = next.rounds.findIndex(round => round.id === draft.roundId);
+        const computed = Clabor.calculate(next).rounds[index];
+        const round = next.rounds[index];
+        round.scores = draft.scores.map(Clabor.parseScore);
+        round.callerId = computed.forced ? computed.callerId : draft.callerId;
+        if (!round.callerId) throw new Error('Укажите, кто выбирал масть.');
+        if (!round.scores.some(score => score > 0)) throw new Error('Пустую раздачу записать нельзя.');
+        round.declarations = Clabor.clone(draft.declarations);
+        if (round.declarations) ['terz', 'fifty'].forEach(type => {
+            if (draft[type + 'Text'] !== undefined) round.declarations[type] = Clabor.parseCount(draft[type + 'Text']);
+        });
+        Clabor.validateRound(round, next, true);
+        delete next.editDraft;
+        next.draft.callerId = Clabor.calculate(next).forcedCallerId || next.draft.callerId;
+        if (await persist(next)) render();
+    } catch (error) { reportError(error); }
+}
+async function cancelEdit() {
+    const next = Clabor.clone(currentGame); delete next.editDraft;
+    if (await persist(next)) renderEditor();
+}
+async function recalculateAllScores() {
+    if (currentGame.editDraft) return saveEditedRound();
+    return guardedAction(async () => { if (await persist(currentGame)) render(); })();
+}
+async function deferGame() {
+    if (await persist(currentGame)) window.location.href = 'index.html';
+}
+async function finishGame(playAgain = false) {
+    if (blocked) return;
+    if (currentGame.editDraft) { reportError(new Error('Сохраните или отмените исправление прошлой раздачи.')); return; }
+    const result = Clabor.calculate(currentGame);
+    const hasDraft = currentGame.draft.scores.some(Boolean) || currentGame.draft.declarations.terz ||
+        currentGame.draft.declarations.fifty || currentGame.draft.declarations.bella;
+    const message = (hasDraft ? 'Незаписанный ввод не войдёт в результат. ' : '') +
+        (playAgain ? 'Сохранить результат и начать реванш тем же составом?' : result.winner ? 'Завершить игру и сохранить в историю?' : 'Закрыть игру досрочно и сохранить в историю без победителя?');
+    if (!await askConfirmation(message)) return;
+    const standings = currentGame.players.map((p, i) => ({ id: p.id, name: playerLabel(p, i), score: result.totals[i], beit: result.beits[i] }));
+    const entry = { id: currentGame.id, version: 2, startedAt: currentGame.startedAt, finishedAt: new Date().toISOString(),
+        mode: currentGame.mode, target: currentGame.target, players: standings.map(s => s.name),
+        standings, winner: standings.find(s => s.id === result.winner) || null, finished: true,
+        status: result.winner ? 'won' : currentGame.rounds.length ? 'closed' : 'empty',
+        pendingNote: pendingDescription(result),
+        roundNotes: result.rounds.map((r, i) => {
+            const d = currentGame.rounds[i].declarations;
+            return (d ? 'Банк: ' + Clabor.bank(d) + '. Терцы: ' + d.terz + ', полтинны: ' + d.fifty +
+                ', белла: ' + (d.bella ? 'да' : 'нет') + '. ' : '') + r.notes.join(' ');
+        }),
+        rounds: currentGame.rounds.map((r, index) => standings.map((p, i) => ({ name: p.name, playerId: p.id,
+            score: r.scores[i], finalScore: result.rounds[index].totals[i], beit: result.rounds[index].beits[i],
+            played: result.rounds[index].callerId === p.id ? 'Да' : 'Нет' }))) };
+    if (currentGame.players.every(p => Array.isArray(p.memberIds))) entry.roster = ClaborPlayers.rosterFromGame(currentGame);
+    try {
+        await saveQueue;
+        if (playAgain) {
+            const {library} = await gameStore.readLibrary();
+            const saved = await gameStore.archiveAndRematch(currentGame, currentToken, entry, ClaborPlayers.rematch(entry, library.profiles));
+            currentGame = saved.game; currentToken = saved.token; unsaved = false; render(); openTab('game');
+        } else {
+            await gameStore.archive(currentGame, currentToken, entry); unsaved = false; window.location.href = 'index.html';
+        }
+    }
+    catch (error) { reportError(error); }
+}
+async function resetGame() {
+    if (blocked || !await askConfirmation('Сбросить игру? Она будет удалена без сохранения.')) return;
+    try { await saveQueue; await gameStore.discard(currentToken); unsaved = false; window.location.href = 'index.html'; }
+    catch (error) { reportError(error); }
+}
+// IndexedDB writes are asynchronous. Freeze editing while committing a round or
+// changing screens, so a second tap or a newer draft cannot replace that commit.
+let actionBusy = false;
+function guardedAction(action) {
+    return async (...args) => {
+        if (actionBusy || blocked || !currentGame) return;
+        actionBusy = true;
+        const controls = [...document.querySelectorAll('#gameForm input, #gameForm button, #editorForm input, #editorForm button, #editorForm select, #bankControls input, #bankControls button, [data-mutation]')].map(node => [node,node.disabled]);
+        controls.forEach(([node]) => {node.disabled=true;});
+        try { return await action(...args); }
+        finally {
+            actionBusy=false;
+            if (!blocked) {
+                controls.forEach(([node,disabled])=>{if(node.isConnected) node.disabled=disabled;});
+                const won = Boolean(Clabor.calculate(currentGame).winner);
+                document.querySelectorAll('#bankControls input, #bankControls button, #recordButton').forEach(node=>{node.disabled=won;});
+                if (won) document.querySelectorAll('#gameForm input, #gameForm button').forEach(node=>{node.disabled=true;});
+            }
+        }
+    };
+}
+recordScores = guardedAction(recordScores);
+startEdit = guardedAction(startEdit);
+saveEditedRound = guardedAction(saveEditedRound);
+cancelEdit = guardedAction(cancelEdit);
+deferGame = guardedAction(deferGame);
+finishGame = guardedAction(finishGame);
+resetGame = guardedAction(resetGame);
+$('gameForm').onsubmit = event => { event.preventDefault(); recordScores(); };
+$('editorForm').onsubmit = event => { event.preventDefault(); saveEditedRound(); };
+window.addEventListener('beforeunload', event => {
+    if (unsaved && !blocked) { event.preventDefault(); event.returnValue = ''; }
+});
+window.addEventListener('clabor-storage', ({detail:event}) => {
+    if (event.key === 'currentGame' || event.key === null) {
+        const error = new Error('Игра изменена в другой вкладке. Обновите страницу, чтобы продолжить.');
+        error.code = 'CONFLICT'; reportError(error);
+    }
+});
+window.addEventListener('pageshow', event => { if (event.persisted) window.location.reload(); });
+async function initializeGame() {
+
+try {
+    gameStore = await ClaborDatabase.open();
+    const saved = await gameStore.readCurrent(); currentGame = saved.game; currentToken = saved.token;
+    if (!currentGame || currentGame.finished) window.location.replace('index.html');
+    else {
+        // Migrate with a backup before editing, never reconstruct a game from legacy side keys.
+        if (JSON.parse(currentToken).version !== 2) await persist(currentGame);
+        render(); openTab(currentGame.editDraft ? 'scores' : 'game');
+    }
+} catch (error) {
+    reportError(error);
+    document.querySelectorAll('[data-mutation]').forEach(control => { control.disabled = true; });
+}
+}
+initializeGame();
