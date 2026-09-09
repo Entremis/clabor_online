@@ -3,7 +3,7 @@ window.ClaborCloud=(function(){
     let store,scheduled,running=false,reauth=false;
     function status(message,error=false) {
         let line=document.getElementById('cloudStatus');
-        if(!line){line=document.createElement('p');line.id='cloudStatus';line.className='hint';line.setAttribute('role','status');document.querySelector('.main-nav')?.after(line);}
+        if(!line){line=document.createElement('p');line.id='cloudStatus';line.className='hint';line.setAttribute('role','status');document.getElementById('appStatus')?.append(line);}
         line.textContent=message;line.classList.toggle('error-message',error);
         window.dispatchEvent(new CustomEvent('clabor-sync-status',{detail:{message,error}}));
     }

@@ -8,9 +8,11 @@
 <link rel="stylesheet" href="styles.css">
 <script src="cloud_config.js"></script><script src="app_shell.js"></script>
 </head>
-<body>
+<body class="game-page">
+<header class="game-heading">
+<a href="index.html">← В меню</a>
 <h2>Игра <span class="target-label">до <span id="targetScore"></span> очков</span></h2>
-<p><a href="index.html">← К настройке игры</a></p>
+</header>
 <p id="gameError" class="error-message" role="alert"></p>
 <button id="reloadGame" hidden onclick="window.location.reload()">Загрузить актуальную игру</button>
 <p id="saveStatus" class="hint" role="status">Сохранено на этом устройстве</p>

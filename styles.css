@@ -422,6 +422,22 @@ h1 { margin:24px 0 16px; font-size:clamp(26px,5vw,34px); }
 h2 { font-size:22px; }
 h3 { font-size:18px; }
 .app-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding:10px 0 16px; }
+.menu-back { display:inline-flex; align-items:center; min-height:44px; }
+#appStatus .hint:empty { display:none; }
+.game-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px 12px; margin-bottom:4px; }
+.game-heading a { display:inline-flex; align-items:center; min-height:44px; }
+.game-heading h2 { margin:0; }
+.game-page #appStatus .hint, .game-page #saveStatus { margin:2px 0; font-size:13px; }
+.game-page .tabs { gap:8px; margin:10px 0; }
+.game-page .tab-button { margin:0; }
+.game-page #game > h3 { margin:12px 0 4px; }
+.game-page .game-player { padding:6px 0; }
+.game-page .score-field { display:grid; grid-template-columns:minmax(0,1fr) 80px auto; gap:8px; margin:4px 0; }
+.game-page .score-field label { min-width:0; }
+.game-page .score-field input { width:100%; }
+.game-page .no-tricks-button { padding:8px; font-size:14px; }
+.game-page .caller-label { padding:4px 0; min-height:44px; }
+.game-page #results { margin-top:10px; }
 .brand { font-size:24px; font-weight:800; color:var(--text); text-decoration:none; }
 .theme-control { display:flex; align-items:center; gap:8px; font-size:14px; }
 .theme-control select { max-width:200px; }
