@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#f6f8fc"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<title>Новая игра — Клабор</title><link rel="stylesheet" href="styles.css"><script src="app_shell.js"></script></head>
+<title>Новая игра — Клабор</title><link rel="stylesheet" href="styles.css"><script src="cloud_config.js"></script><script src="app_shell.js"></script></head>
 <body>
 <h1>Новая игра</h1><p id="setupError" class="error-message" role="alert"></p>
 <div id="resumeBlock" class="resume-block" hidden><strong>Незаконченная игра:</strong> <span id="resumePlayers"></span><a href="game_page.html">Продолжить</a></div>
@@ -22,5 +22,5 @@
 <button id="startGameButton" type="submit">Начать игру</button>
 </fieldset></form>
 <p id="setupStatus" class="hint" role="status"></p>
-<script src="confirmation.js"></script><script src="vendor/dexie.min.js"></script><script src="game_engine.js"></script><script src="game_store.js"></script><script src="database.js"></script><script src="player_library.js"></script><script src="setup.js"></script>
+<script src="confirmation.js"></script><script src="vendor/dexie.min.js"></script><script src="game_engine.js"></script><script src="game_store.js"></script><script src="player_library.js"></script><script src="sync_model.js"></script><script src="database.js"></script><script src="cloud_client.js"></script><script src="setup.js"></script>
 </body></html>

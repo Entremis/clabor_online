@@ -38,7 +38,9 @@ icon(192,'icon-192.png'); icon(512,'icon-512.png'); icon(180,'apple-touch-icon.p
 if (!process.argv.includes('--prepare')) {
     const hash=crypto.createHash('sha256');
     for (const file of files) {
-        const data=fs.readFileSync(path.join(__dirname,file)); hash.update(file).update(data);
+        const data=file==='cloud_config.js' && process.env.CLABOR_API_URL
+            ? Buffer.from('window.CLABOR_CLOUD = '+JSON.stringify({apiUrl:process.env.CLABOR_API_URL.replace(/\/$/,'')})+';\n')
+            : fs.readFileSync(path.join(__dirname,file)); hash.update(file).update(data);
         const target=path.join(__dirname,'dist',file); fs.mkdirSync(path.dirname(target),{recursive:true}); fs.writeFileSync(target,data);
     }
     const worker=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8'); hash.update(worker);

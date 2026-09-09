@@ -16,7 +16,7 @@ function playerLabel(player, index) {
 }
 function reportError(error) {
     $('gameError').textContent = error.message || String(error);
-    if (error.code === 'CONFLICT') {
+    if (error.code === 'CONFLICT' || error.code === 'ACCOUNT_CHANGED') {
         blocked = true;
         document.querySelectorAll('#gameForm input, #gameForm button, #editorForm input, #editorForm button, #editorForm select, #bankControls button, #bankControls input, [data-mutation]')
             .forEach(control => { control.disabled = true; });
@@ -359,8 +359,15 @@ $('editorForm').onsubmit = event => { event.preventDefault(); saveEditedRound();
 window.addEventListener('beforeunload', event => {
     if (unsaved && !blocked) { event.preventDefault(); event.returnValue = ''; }
 });
-window.addEventListener('clabor-storage', ({detail:event}) => {
+window.addEventListener('clabor-storage', async ({detail:event}) => {
     if (event.key === 'currentGame' || event.key === null) {
+        if(currentGame && !unsaved && !actionBusy && !currentGame.editDraft && !currentGame.draft.scores.some(Boolean)) {
+            try {
+                const saved=await gameStore.readCurrent();
+                if(!saved.game){location.replace('index.html');return;}
+                currentGame=saved.game;currentToken=saved.token;render();return;
+            }catch(error){reportError(error);return;}
+        }
         const error = new Error('Игра изменена в другой вкладке. Обновите страницу, чтобы продолжить.');
         error.code = 'CONFLICT'; reportError(error);
     }

@@ -1,0 +1,10 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "clabor-cloud",
+  "main": "index.mjs",
+  "compatibility_date": "2026-07-21",
+  "account_id": "530c818c1287dd2001a716c5a632ba5b",
+  "workers_dev": true,
+  "d1_databases": [{"binding":"DB","database_name":"clabor-data","database_id":"5eb3d339-e733-42a5-8b6e-c2c7ab7d396a","migrations_dir":"migrations"}],
+  "vars": {"ALLOWED_ORIGINS":"http://127.0.0.1:4190,http://127.0.0.1:4191,https://clabor-online.vercel.app,https://clabor-online-git-main-entremis.vercel.app"}
+}

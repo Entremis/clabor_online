@@ -4,7 +4,8 @@ const FILES = ['index.html','game_page.html','history.html','players.html','stat
     'setup.js','game_logic.js','game_engine.js','game_store.js','database.js','player_library.js',
     'confirmation.js','history.js','players.js','statistics.js','app_shell.js','styles.css',
     'manifest.webmanifest','icons/icon.svg','icons/icon-192.png','icons/icon-512.png',
-    'icons/apple-touch-icon.png','vendor/dexie.min.js','vendor/DEXIE-LICENSE'];
+    'icons/apple-touch-icon.png','vendor/dexie.min.js','vendor/DEXIE-LICENSE',
+    'cloud_config.js','sync_model.js','cloud_client.js','account.html','account.js'];
 const base = new URL('./', self.location.href);
 const urls = new Set(FILES.map(file => new URL(file,base).href));
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll([...urls]))));

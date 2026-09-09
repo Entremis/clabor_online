@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#f6f8fc"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<title>Игроки — Клабор</title><link rel="stylesheet" href="styles.css"><script src="app_shell.js"></script></head>
+<title>Игроки — Клабор</title><link rel="stylesheet" href="styles.css"><script src="cloud_config.js"></script><script src="app_shell.js"></script></head>
 <body>
 <h1>Игроки</h1><p class="hint">Один профиль для личных и парных игр. Звёздочкой отмечены избранные — они первыми в выборе состава.</p>
 <p id="playersError" class="error-message" role="alert"></p>
@@ -9,5 +9,5 @@
 <label class="caller-label"><input id="showArchived" type="checkbox">Показать архивные профили</label>
 <div id="profilesList"></div>
 <h2>Сохранённые составы</h2><p class="hint">Составы создаются на экране новой игры. Удаление состава не удаляет сыгранные партии.</p><div id="lineupsList"></div>
-<script src="confirmation.js"></script><script src="vendor/dexie.min.js"></script><script src="game_engine.js"></script><script src="game_store.js"></script><script src="database.js"></script><script src="player_library.js"></script><script src="players.js"></script>
+<script src="confirmation.js"></script><script src="vendor/dexie.min.js"></script><script src="game_engine.js"></script><script src="game_store.js"></script><script src="player_library.js"></script><script src="sync_model.js"></script><script src="database.js"></script><script src="cloud_client.js"></script><script src="players.js"></script>
 </body></html>
